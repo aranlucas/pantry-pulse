@@ -1,0 +1,4 @@
+ADMIN_TOKEN=replace-with-a-long-random-admin-token
+DEVICE_TOKEN=replace-with-a-different-long-random-device-token
+MCP_READ_TOKEN=replace-with-a-read-only-mcp-token
+MCP_WRITE_TOKEN=replace-with-a-separate-write-capable-mcp-token

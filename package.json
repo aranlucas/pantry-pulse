@@ -1,0 +1,52 @@
+{
+  "name": "pantry-pulse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm build:web",
+    "build:web": "vite build",
+    "cf-typegen": "wrangler types",
+    "cf-typegen:check": "wrangler types --check",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm cf-typegen:check && pnpm build",
+    "db:migrate:local": "wrangler d1 migrations apply pantry-pulse --local",
+    "db:migrate:remote": "wrangler d1 migrations apply pantry-pulse --remote",
+    "db:seed:local": "wrangler d1 execute pantry-pulse --local --file scripts/seed.sql",
+    "db:seed:remote": "wrangler d1 execute pantry-pulse --remote --file scripts/seed.sql",
+    "deploy": "wrangler deploy",
+    "dev": "concurrently --kill-others-on-fail --names web,worker 'vite --host 127.0.0.1' 'wrangler dev --port 8787'",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --deny-warnings .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b",
+    "wrangler": "wrangler"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "agents": "0.22.0",
+    "lucide-react": "1.37.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.2",
+    "@types/node": "26.4.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "6.1.1",
+    "concurrently": "10.0.5",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
+    "typescript": "6.0.3",
+    "vite": "8.2.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.1"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.24.0"
+}

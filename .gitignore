@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.wrangler/
+.pio/
+.dev.vars
+.DS_Store
+coverage/
+worker-configuration.d.ts.tmp
+firmware/esp32-rfid/config.h
