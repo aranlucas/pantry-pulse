@@ -46,7 +46,12 @@ Before committing:
 
 ```bash
 pnpm check && pnpm test
+pnpm audit --prod --audit-level high
 ```
+
+The package is marked `private` only to prevent accidental publication to the
+npm registry; the source repository is intended to be public under the MIT
+license.
 
 ## Deploy
 
@@ -103,6 +108,16 @@ so safe retries cannot double-apply inventory.
 The dashboard deliberately labels station status as unavailable until a real
 heartbeat is implemented; successful inventory reads are not presented as
 proof that the physical reader is online.
+
+## Security and privacy
+
+Never commit `.dev.vars`, firmware `config.h`, device credentials, or exported
+inventory data. The tracked example files contain placeholders only. Use a
+different random token for every role and installation, and give MCP clients a
+read token unless they genuinely need mutation tools.
+
+Please report vulnerabilities privately through the process in
+[`SECURITY.md`](SECURITY.md), not through a public issue.
 
 ## Product design
 
