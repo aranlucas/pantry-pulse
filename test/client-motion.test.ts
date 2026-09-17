@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { motionSafeScrollBehavior, prefersReducedMotion, scrollDashboardToView } from "../src/client/motion";
+import {
+  motionSafeScrollBehavior,
+  prefersReducedMotion,
+  REDUCED_MOTION_QUERY,
+  scrollDashboardToView,
+} from "../src/client/motion";
 import type { View } from "../src/client/types";
-
-function media(matches: Record<string, boolean>) {
-  return (query: string): { matches: boolean } => ({ matches: matches[query] === true });
-}
 
 describe("dashboard motion", () => {
   it("uses instant scrolling when the user prefers reduced motion", () => {
-    expect(prefersReducedMotion(media({ "(prefers-reduced-motion: reduce)": true }))).toBe(true);
+    expect(prefersReducedMotion((query) => query === REDUCED_MOTION_QUERY)).toBe(true);
+    expect(prefersReducedMotion(() => false)).toBe(false);
     expect(motionSafeScrollBehavior(true)).toBe("auto");
     expect(motionSafeScrollBehavior(false)).toBe("smooth");
   });

@@ -3,8 +3,10 @@ import type { View } from "./types";
 export const DESKTOP_LAYOUT_QUERY = "(min-width: 821px)";
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
-export function prefersReducedMotion(media = window.matchMedia): boolean {
-  return media(REDUCED_MOTION_QUERY).matches;
+export function prefersReducedMotion(
+  matches: (query: string) => boolean = (query) => window.matchMedia(query).matches,
+): boolean {
+  return matches(REDUCED_MOTION_QUERY);
 }
 
 export function motionSafeScrollBehavior(reducedMotion = prefersReducedMotion()): ScrollBehavior {
@@ -16,7 +18,9 @@ export function scrollDashboardToView(
   options: {
     isDesktop?: boolean;
     behavior?: ScrollBehavior;
-    getElementById?: (id: string) => { scrollIntoView(options?: ScrollIntoViewOptions): void } | null;
+    getElementById?: (
+      id: string,
+    ) => { scrollIntoView(options?: ScrollIntoViewOptions): void } | null;
     scrollTo?: (options: ScrollToOptions) => void;
   } = {},
 ): void {

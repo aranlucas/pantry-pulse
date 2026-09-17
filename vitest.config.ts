@@ -19,5 +19,11 @@ export default defineConfig({
   ],
   test: {
     setupFiles: ["./test/setup.ts"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "test/client-dashboard.test.tsx",
+      "test/client-motion.test.ts",
+    ],
   },
 });

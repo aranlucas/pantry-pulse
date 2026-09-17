@@ -18,7 +18,7 @@
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --deny-warnings .",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.client.config.ts && vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "wrangler": "wrangler"
@@ -42,7 +42,7 @@
     "oxlint": "1.82.0",
     "typescript": "7.0.2",
     "vite": "8.3.0",
-    "vitest": "5.0.0",
+    "vitest": "4.1.11",
     "wrangler": "4.131.1"
   },
   "engines": {
