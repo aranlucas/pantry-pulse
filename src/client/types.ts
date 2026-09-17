@@ -1,58 +1,64 @@
 export type View = "pantry" | "queue" | "activity";
 
+/** Matches Worker `PantryItem`. */
 export type InventoryItem = {
   id: string;
   name: string;
-  tagUid: string | null;
-  unit: string | null;
-  onHand: number;
-  target: number;
-  provider: string | null;
+  unit: string;
+  quantity: number;
+  targetQuantity: number;
+  rfidUid: string | null;
+  catalogProvider: string | null;
+  providerItemId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Matches Worker `ShoppingNeed`. */
+export type ShoppingItem = {
+  itemId: string;
+  name: string;
+  unit: string;
+  quantityNeeded: number;
+  catalogProvider: string | null;
   providerItemId: string | null;
 };
 
-export type ShoppingItem = {
-  id: string;
-  name: string;
-  amount: number;
-  unit: string | null;
-};
-
+/** Matches Worker `InventoryActivity`. */
 export type ActivityEvent = {
-  id: string;
-  kind: string;
+  eventId: string;
+  itemId: string;
   itemName: string;
-  tagUid: string | null;
-  source: string | null;
+  rfidUid: string | null;
+  delta: number;
+  source: "admin" | "device" | "mcp";
+  reason: string;
+  deviceId: string | null;
   createdAt: string;
 };
 
-export type StationStatus = {
-  online: boolean | null;
-  name: string;
-  detail: string;
-};
-
+/** Matches Worker `PantrySnapshot`. `/api/snapshot` does not report station state. */
 export type PantrySnapshot = {
+  generatedAt: string;
+  summary: {
+    itemCount: number;
+    lowStockCount: number;
+    unitsNeeded: number;
+  };
   items: InventoryItem[];
   shoppingQueue: ShoppingItem[];
-  activity: ActivityEvent[];
-  station: StationStatus;
+  recentActivity: ActivityEvent[];
 };
 
+/** Matches Worker `dashboardLinkItemSchema` write fields. */
 export type LinkItemInput = {
-  tagUid: string;
+  rfidUid: string;
   name: string;
   unit: string;
   onHand: number | null;
   target: number | null;
   catalogProvider: string;
   providerItemId: string;
-};
-
-export type MutationResponse = {
-  item?: InventoryItem;
-  snapshot?: PantrySnapshot;
 };
 
 export type ApiRecord = Record<string, unknown>;

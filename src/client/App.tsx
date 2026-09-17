@@ -8,7 +8,6 @@ import {
   ChevronUp,
   CircleAlert,
   CircleCheck,
-  CircleHelp,
   Coffee,
   Copy,
   KeyRound,
@@ -25,21 +24,19 @@ import {
   Soup,
   Tag,
   Wheat,
-  Wifi,
-  WifiOff,
   X,
 } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { adjustItem, fetchSnapshot, isAuthError, linkItem } from "./api";
+import { activityWasConsumed } from "./snapshot";
 import type {
   ActivityEvent,
   InventoryItem,
   LinkItemInput,
   PantrySnapshot,
   ShoppingItem,
-  StationStatus,
   View,
 } from "./types";
 
@@ -48,7 +45,7 @@ const TOKEN_STORAGE_KEY = "pantry-pulse-admin-token";
 type AuthState = "checking" | "locked" | "loading" | "ready";
 
 type LinkFormState = {
-  tagUid: string;
+  rfidUid: string;
   name: string;
   unit: string;
   onHand: string;
@@ -58,7 +55,7 @@ type LinkFormState = {
 };
 
 const EMPTY_LINK_FORM: LinkFormState = {
-  tagUid: "",
+  rfidUid: "",
   name: "",
   unit: "",
   onHand: "",
@@ -97,22 +94,27 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
-function formatQuantity(value: number | null, unit: string | null): string {
-  if (value === null) return "—";
+function formatQuantity(value: number, unit: string): string {
   return `${formatNumber(value)}${unit ? ` ${unit}` : ""}`;
 }
 
-function formatTagUid(tagUid: string | null): string {
-  return tagUid ? tagUid.toUpperCase() : "No tag linked";
+function formatRfidUid(rfidUid: string | null): string {
+  return rfidUid ? rfidUid.toUpperCase() : "No tag linked";
+}
+
+function formatActivitySource(source: ActivityEvent["source"]): string {
+  if (source === "device") return "RFID station";
+  if (source === "mcp") return "MCP";
+  return "Dashboard";
 }
 
 function isLowStock(item: InventoryItem): boolean {
-  return item.target > 0 && item.onHand < item.target;
+  return item.targetQuantity > 0 && item.quantity < item.targetQuantity;
 }
 
 function progressFor(item: InventoryItem): number {
-  if (item.target <= 0) return item.onHand > 0 ? 100 : 0;
-  return Math.min(100, Math.max(0, (item.onHand / item.target) * 100));
+  if (item.targetQuantity <= 0) return item.quantity > 0 ? 100 : 0;
+  return Math.min(100, Math.max(0, (item.quantity / item.targetQuantity) * 100));
 }
 
 function itemIconFor(name: string) {
@@ -136,10 +138,6 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
-function activityWasConsumed(event: ActivityEvent): boolean {
-  return /consume|decreas|remov|use|minus|rfid consume/i.test(event.kind);
-}
-
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -147,12 +145,12 @@ function errorMessage(error: unknown, fallback: string): string {
 function formFromItem(item: InventoryItem | undefined): LinkFormState {
   if (!item) return EMPTY_LINK_FORM;
   return {
-    tagUid: item.tagUid ?? "",
+    rfidUid: item.rfidUid ?? "",
     name: item.name,
-    unit: item.unit ?? "",
-    onHand: String(item.onHand),
-    target: String(item.target),
-    catalogProvider: item.provider ?? "",
+    unit: item.unit,
+    onHand: String(item.quantity),
+    target: String(item.targetQuantity),
+    catalogProvider: item.catalogProvider ?? "",
     providerItemId: item.providerItemId ?? "",
   };
 }
@@ -164,20 +162,6 @@ function nullableInteger(value: string, label: string): number | null {
     throw new Error(`${label} must be a whole number of zero or more.`);
   }
   return parsed;
-}
-
-function patchItemInSnapshot(
-  current: PantrySnapshot | null,
-  updated: InventoryItem,
-): PantrySnapshot | null {
-  if (!current) return current;
-  const hasItem = current.items.some((item) => item.id === updated.id);
-  return {
-    ...current,
-    items: hasItem
-      ? current.items.map((item) => (item.id === updated.id ? updated : item))
-      : [...current.items, updated],
-  };
 }
 
 function BrandMark({ onHome }: { onHome?: () => void } = {}): ReactNode {
@@ -200,34 +184,6 @@ function BrandMark({ onHome }: { onHome?: () => void } = {}): ReactNode {
       </span>
       <span className="brand-name">Pantry Pulse</span>
     </a>
-  );
-}
-
-function StationStatus({ station }: { station: StationStatus }): ReactNode {
-  const state =
-    station.online === true ? "online" : station.online === false ? "offline" : "unknown";
-  const title =
-    state === "online"
-      ? "Station online"
-      : state === "offline"
-        ? "Station offline"
-        : "Station status unavailable";
-
-  return (
-    <div className={`station-status is-${state}`}>
-      <span className="station-indicator" aria-hidden="true" />
-      <span className="station-copy">
-        <strong>{title}</strong>
-        <span>{station.detail || station.name}</span>
-      </span>
-      {state === "online" ? (
-        <Wifi size={18} strokeWidth={1.8} aria-hidden="true" />
-      ) : state === "offline" ? (
-        <WifiOff size={18} strokeWidth={1.8} aria-hidden="true" />
-      ) : (
-        <CircleHelp size={18} strokeWidth={1.8} aria-hidden="true" />
-      )}
-    </div>
   );
 }
 
@@ -257,9 +213,6 @@ function AccessGate({
     <div className="access-shell">
       <header className="app-header access-header">
         <BrandMark />
-        <StationStatus
-          station={{ online: null, name: "Station", detail: "ESP32 · RFID Station" }}
-        />
       </header>
 
       <main className="access-layout" id="main-content">
@@ -310,12 +263,10 @@ function AccessGate({
 
 function AppHeader({
   activeView,
-  station,
   onLock,
   onNavigate,
 }: {
   activeView: View;
-  station: StationStatus;
   onLock: () => void;
   onNavigate: (view: View) => void;
 }): ReactNode {
@@ -342,7 +293,6 @@ function AppHeader({
         ))}
       </nav>
       <div className="header-actions">
-        <StationStatus station={station} />
         <button
           className="icon-button header-lock"
           type="button"
@@ -406,7 +356,7 @@ function InventoryRow({
         </span>
         <span className="item-name-group">
           <strong>{item.name}</strong>
-          <span>{formatTagUid(item.tagUid)}</span>
+          <span>{formatRfidUid(item.rfidUid)}</span>
         </span>
         <span className="mobile-chevron" aria-hidden="true">
           {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -428,36 +378,36 @@ function InventoryRow({
       </div>
 
       <div className={`have-target-cell ${low ? "is-low" : ""}`}>
-        <strong>{formatNumber(item.onHand)}</strong>
-        <span>/ {formatQuantity(item.target, item.unit)}</span>
+        <strong>{formatNumber(item.quantity)}</strong>
+        <span>/ {formatQuantity(item.targetQuantity, item.unit)}</span>
       </div>
 
       <div className="adjust-cell" id={`item-controls-${item.id}`}>
         <button
           className="quantity-button"
           type="button"
-          aria-label={`Remove one ${item.unit ?? "unit"} of ${item.name}`}
-          title={`Remove one ${item.unit ?? "unit"}`}
-          disabled={pending || item.onHand <= 0}
+          aria-label={`Remove one ${item.unit || "unit"} of ${item.name}`}
+          title={`Remove one ${item.unit || "unit"}`}
+          disabled={pending || item.quantity <= 0}
           onClick={() => onAdjust(-1)}
         >
           <Minus size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <output
           className="quantity-output"
-          aria-label={`${formatNumber(item.onHand)} ${item.unit ?? "units"} on hand`}
+          aria-label={`${formatNumber(item.quantity)} ${item.unit || "units"} on hand`}
         >
           {pending ? (
             <LoaderCircle className="spin" size={18} aria-hidden="true" />
           ) : (
-            formatNumber(item.onHand)
+            formatNumber(item.quantity)
           )}
         </output>
         <button
           className="quantity-button"
           type="button"
-          aria-label={`Add one ${item.unit ?? "unit"} of ${item.name}`}
-          title={`Add one ${item.unit ?? "unit"}`}
+          aria-label={`Add one ${item.unit || "unit"} of ${item.name}`}
+          title={`Add one ${item.unit || "unit"}`}
           disabled={pending}
           onClick={() => onAdjust(1)}
         >
@@ -531,7 +481,9 @@ function ShoppingReceipt({
 
   const copyList = async (): Promise<void> => {
     const text = items.length
-      ? items.map((item) => `- ${item.name}: ${formatQuantity(item.amount, item.unit)}`).join("\n")
+      ? items
+          .map((item) => `- ${item.name}: ${formatQuantity(item.quantityNeeded, item.unit)}`)
+          .join("\n")
       : "Pantry is fully stocked.";
     setCopyError(null);
     try {
@@ -557,12 +509,14 @@ function ShoppingReceipt({
       {items.length ? (
         <ul className="receipt-list">
           {items.map((item) => (
-            <li className="receipt-line" key={item.id}>
+            <li className="receipt-line" key={item.itemId}>
               <span className="receipt-line-icon" aria-hidden="true">
                 <Package size={17} strokeWidth={1.7} />
               </span>
               <span className="receipt-item-name">{item.name}</span>
-              <span className="receipt-amount">{formatQuantity(item.amount, item.unit)}</span>
+              <span className="receipt-amount">
+                {formatQuantity(item.quantityNeeded, item.unit)}
+              </span>
             </li>
           ))}
         </ul>
@@ -620,9 +574,9 @@ function ActivitySection({
             <span role="columnheader">When</span>
           </div>
           {events.map((event) => {
-            const consumed = activityWasConsumed(event);
+            const consumed = activityWasConsumed(event.delta);
             return (
-              <div className="activity-row" role="row" key={event.id}>
+              <div className="activity-row" role="row" key={event.eventId}>
                 <span
                   className={`activity-direction ${consumed ? "is-consumed" : "is-restocked"}`}
                   role="cell"
@@ -636,10 +590,10 @@ function ActivitySection({
                 </span>
                 <span className="activity-item" role="cell">
                   <strong>{event.itemName}</strong>
-                  <small>{formatTagUid(event.tagUid)}</small>
+                  <small>{formatRfidUid(event.rfidUid)}</small>
                 </span>
                 <span className="activity-source" role="cell">
-                  {event.source ?? "RFID Station (Pantry)"}
+                  {formatActivitySource(event.source)}
                 </span>
                 <time className="activity-time" role="cell" dateTime={event.createdAt}>
                   {formatDate(event.createdAt)}
@@ -814,9 +768,9 @@ function LinkTagDrawer({
             <input
               ref={firstFieldRef}
               id="tag-uid"
-              name="tagUid"
-              value={form.tagUid}
-              onChange={(event) => onFormChange("tagUid", event.target.value)}
+              name="rfidUid"
+              value={form.rfidUid}
+              onChange={(event) => onFormChange("rfidUid", event.target.value)}
               placeholder="04 A1 B2 C3 D4"
               autoComplete="off"
               spellCheck={false}
@@ -960,12 +914,7 @@ function Dashboard({
 }): ReactNode {
   return (
     <div className="dashboard-shell">
-      <AppHeader
-        activeView={activeView}
-        station={snapshot.station}
-        onLock={onLock}
-        onNavigate={onNavigate}
-      />
+      <AppHeader activeView={activeView} onLock={onLock} onNavigate={onNavigate} />
       <div className="dashboard-notices" aria-live="polite">
         {refreshing ? <Spinner label="Refreshing pantry" /> : null}
         {notice ? (
@@ -995,7 +944,7 @@ function Dashboard({
             onAdjust={onAdjust}
             onToggle={onToggle}
           />
-          <ActivitySection events={snapshot.activity} anchorId="activity-view" />
+          <ActivitySection events={snapshot.recentActivity} anchorId="activity-view" />
         </section>
         <aside className="shopping-pane">
           <ShoppingReceipt items={snapshot.shoppingQueue} anchorId="queue-view" />
@@ -1022,7 +971,7 @@ function Dashboard({
         ) : null}
         {activeView === "activity" ? (
           <section className="mobile-view mobile-activity-view" aria-label="Activity view">
-            <ActivitySection events={snapshot.activity} />
+            <ActivitySection events={snapshot.recentActivity} />
           </section>
         ) : null}
       </main>
@@ -1147,25 +1096,9 @@ export function App(): ReactNode {
     setError(null);
     setNotice(null);
     try {
-      const result = await adjustItem(token, item.id, delta);
-      let followUpNotice: string | null = null;
-      if (result.snapshot) {
-        acceptSnapshot(result.snapshot);
-      } else if (result.item) {
-        setSnapshot((current) => patchItemInSnapshot(current, result.item!));
-        try {
-          acceptSnapshot(await fetchSnapshot(token));
-        } catch (followUpFailure: unknown) {
-          if (isAuthError(followUpFailure)) {
-            handleAuthFailure(followUpFailure);
-            return;
-          }
-          followUpNotice = `${item.name} updated. Refresh to sync the queue.`;
-        }
-      } else {
-        acceptSnapshot(await fetchSnapshot(token));
-      }
-      setNotice(followUpNotice ?? `${item.name} ${delta > 0 ? "restocked" : "used"}.`);
+      await adjustItem(token, item.id, delta);
+      acceptSnapshot(await fetchSnapshot(token));
+      setNotice(`${item.name} ${delta > 0 ? "restocked" : "used"}.`);
     } catch (failure: unknown) {
       if (isAuthError(failure)) {
         handleAuthFailure(failure);
@@ -1180,7 +1113,7 @@ export function App(): ReactNode {
   const openDrawer = (itemId?: string): void => {
     const selected =
       snapshot?.items.find((item) => item.id === itemId) ??
-      snapshot?.items.find((item) => !item.tagUid) ??
+      snapshot?.items.find((item) => !item.rfidUid) ??
       snapshot?.items[0];
     setLinkTargetId(selected?.id ?? "");
     setLinkForm(formFromItem(selected));
@@ -1202,7 +1135,7 @@ export function App(): ReactNode {
       setDrawerError("Choose a pantry item before linking a tag.");
       return;
     }
-    if (!linkForm.tagUid.trim()) {
+    if (!linkForm.rfidUid.trim()) {
       setDrawerError("Enter the RFID tag UID.");
       return;
     }
@@ -1220,7 +1153,7 @@ export function App(): ReactNode {
     setError(null);
     try {
       const input: LinkItemInput = {
-        tagUid: linkForm.tagUid.trim(),
+        rfidUid: linkForm.rfidUid.trim(),
         name: linkForm.name.trim(),
         unit: linkForm.unit.trim(),
         onHand,
@@ -1228,23 +1161,8 @@ export function App(): ReactNode {
         catalogProvider: linkForm.catalogProvider.trim(),
         providerItemId: linkForm.providerItemId.trim(),
       };
-      const result = await linkItem(token, linkTargetId, input);
-      if (result.snapshot) {
-        acceptSnapshot(result.snapshot);
-      } else if (result.item) {
-        setSnapshot((current) => patchItemInSnapshot(current, result.item!));
-        try {
-          acceptSnapshot(await fetchSnapshot(token));
-        } catch (followUpFailure: unknown) {
-          if (isAuthError(followUpFailure)) {
-            handleAuthFailure(followUpFailure);
-            return;
-          }
-          // The item response is still authoritative for the linked row.
-        }
-      } else {
-        acceptSnapshot(await fetchSnapshot(token));
-      }
+      await linkItem(token, linkTargetId, input);
+      acceptSnapshot(await fetchSnapshot(token));
       setDrawerOpen(false);
       setNotice(`${linkForm.name || "Item"} linked to the pantry station.`);
     } catch (failure: unknown) {

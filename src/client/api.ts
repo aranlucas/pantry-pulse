@@ -1,13 +1,5 @@
-import type {
-  ActivityEvent,
-  ApiRecord,
-  InventoryItem,
-  LinkItemInput,
-  MutationResponse,
-  PantrySnapshot,
-  ShoppingItem,
-  StationStatus,
-} from "./types";
+import type { LinkItemInput, PantrySnapshot } from "./types";
+import { decodeSnapshot } from "./snapshot";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -19,118 +11,12 @@ export class ApiError extends Error {
   }
 }
 
-function asRecord(value: unknown): ApiRecord {
-  return typeof value === "object" && value !== null ? (value as ApiRecord) : {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
-}
-
-function asNullableString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function asNumber(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return fallback;
-}
-
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function decodeItem(value: unknown, index: number): InventoryItem {
-  const record = asRecord(value);
-  const id = asString(record.id ?? record.itemId ?? record.tagUid, `item-${index + 1}`);
-
-  return {
-    id,
-    name: asString(record.name ?? record.itemName, "Unnamed item"),
-    tagUid: asNullableString(record.tagUid ?? record.tagUID ?? record.rfidUid ?? record.uid),
-    unit: asNullableString(record.unit),
-    onHand: asNumber(record.onHand ?? record.quantity ?? record.have),
-    target: asNumber(record.target ?? record.targetQuantity),
-    provider: asNullableString(record.provider ?? record.catalogProvider ?? record.providerName),
-    providerItemId: asNullableString(record.providerItemId ?? record.catalogItemId),
-  };
-}
-
-function decodeShoppingItem(value: unknown, index: number): ShoppingItem {
-  const record = asRecord(value);
-  return {
-    id: asString(record.id ?? record.itemId, `queue-${index + 1}`),
-    name: asString(record.name ?? record.itemName, "Unnamed item"),
-    amount: asNumber(record.amount ?? record.needed ?? record.quantityNeeded ?? record.quantity),
-    unit: asNullableString(record.unit),
-  };
-}
-
-function decodeActivity(value: unknown, index: number): ActivityEvent {
-  const record = asRecord(value);
-  return {
-    id: asString(record.id ?? record.eventId, `event-${index + 1}`),
-    kind: asString(
-      record.kind ?? record.type ?? record.eventType ?? record.reason,
-      asNumber(record.delta) < 0 ? "consumed" : "restocked",
-    ),
-    itemName: asString(record.itemName ?? record.name, "Unnamed item"),
-    tagUid: asNullableString(record.tagUid ?? record.tagUID ?? record.rfidUid ?? record.uid),
-    source: asNullableString(record.source ?? record.origin),
-    createdAt: asString(
-      record.createdAt ?? record.timestamp ?? record.occurredAt,
-      new Date().toISOString(),
-    ),
-  };
-}
-
-function decodeStation(value: unknown): StationStatus {
-  const record = asRecord(value);
-  const online =
-    typeof record.online === "boolean"
-      ? record.online
-      : typeof record.connected === "boolean"
-        ? record.connected
-        : null;
-
-  return {
-    online,
-    name: asString(record.name, "Station"),
-    detail: asString(record.detail ?? record.type, "ESP32 · RFID Station"),
-  };
-}
-
-export function decodeSnapshot(value: unknown): PantrySnapshot {
-  const record = asRecord(value);
-  const items = asArray(record.items ?? record.inventory).map(decodeItem);
-  const shoppingQueue = asArray(record.shoppingQueue ?? record.shopping ?? record.queue).map(
-    decodeShoppingItem,
-  );
-  const activity = asArray(
-    record.activity ?? record.recentScans ?? record.recentActivity ?? record.events,
-  ).map(decodeActivity);
-
-  return {
-    items,
-    shoppingQueue,
-    activity,
-    station: decodeStation(record.station ?? record.stationStatus),
-  };
-}
-
-function decodeMutation(value: unknown): MutationResponse {
-  const record = asRecord(value);
-  const item = record.item ? decodeItem(record.item, 0) : undefined;
-  const snapshot = record.snapshot ? decodeSnapshot(record.snapshot) : undefined;
-
-  if (!item && record.id) {
-    return { item: decodeItem(record, 0), snapshot };
-  }
-  return { item, snapshot };
 }
 
 async function requestJson(token: string, path: string, init: RequestInit = {}): Promise<unknown> {
@@ -197,12 +83,8 @@ export async function fetchSnapshot(token: string): Promise<PantrySnapshot> {
   return decodeSnapshot(await requestJson(token, "/api/snapshot"));
 }
 
-export async function adjustItem(
-  token: string,
-  itemId: string,
-  delta: number,
-): Promise<MutationResponse> {
-  const response = await requestJson(token, `/api/items/${encodeURIComponent(itemId)}/adjust`, {
+export async function adjustItem(token: string, itemId: string, delta: number): Promise<void> {
+  await requestJson(token, `/api/items/${encodeURIComponent(itemId)}/adjust`, {
     method: "POST",
     body: JSON.stringify({
       delta,
@@ -210,18 +92,13 @@ export async function adjustItem(
       reason: "manual adjustment",
     }),
   });
-  return decodeMutation(response);
 }
 
-export async function linkItem(
-  token: string,
-  itemId: string,
-  input: LinkItemInput,
-): Promise<MutationResponse> {
-  const response = await requestJson(token, `/api/items/${encodeURIComponent(itemId)}/link`, {
+export async function linkItem(token: string, itemId: string, input: LinkItemInput): Promise<void> {
+  await requestJson(token, `/api/items/${encodeURIComponent(itemId)}/link`, {
     method: "POST",
     body: JSON.stringify({
-      rfidUid: input.tagUid,
+      rfidUid: input.rfidUid,
       name: input.name,
       unit: input.unit || null,
       onHand: input.onHand,
@@ -230,7 +107,6 @@ export async function linkItem(
       providerItemId: input.providerItemId || null,
     }),
   });
-  return decodeMutation(response);
 }
 
 export function isAuthError(error: unknown): boolean {
