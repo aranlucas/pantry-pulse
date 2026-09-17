@@ -13,5 +13,6 @@
     "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"],
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/worker.ts", "src/server/**/*.ts", "test/**/*.ts"]
+  "include": ["src/worker.ts", "src/server/**/*.ts", "test/**/*.ts"],
+  "exclude": ["test/client-motion.test.ts"]
 }
