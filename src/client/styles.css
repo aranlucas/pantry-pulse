@@ -259,7 +259,7 @@ label {
   }
 }
 
-.desktop-dashboard {
+.dashboard-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(370px, 34vw);
   min-height: calc(100vh - 82px);
@@ -761,7 +761,6 @@ label {
   text-align: center;
 }
 
-.mobile-dashboard,
 .mobile-bottom-nav {
   display: none;
 }
@@ -991,7 +990,7 @@ label {
     padding-left: 30px;
   }
 
-  .desktop-dashboard {
+  .dashboard-main {
     grid-template-columns: minmax(0, 1fr) minmax(320px, 36vw);
   }
 
@@ -1020,8 +1019,7 @@ label {
     padding: 0 20px;
   }
 
-  .desktop-nav,
-  .desktop-dashboard {
+  .desktop-nav {
     display: none;
   }
 
@@ -1042,18 +1040,32 @@ label {
     padding: 0 20px;
   }
 
-  .mobile-dashboard {
+  .dashboard-main {
     display: block;
     min-height: calc(100vh - 82px);
     padding: 0 20px 104px;
   }
 
-  .mobile-view {
-    min-width: 0;
-    padding-top: 34px;
+  .dashboard-main[data-active-view="pantry"] .shopping-pane,
+  .dashboard-main[data-active-view="pantry"] .activity-section {
+    display: none;
   }
 
-  .mobile-view .inventory-header {
+  .dashboard-main[data-active-view="queue"] .inventory-pane {
+    display: none;
+  }
+
+  .dashboard-main[data-active-view="activity"] .inventory-block,
+  .dashboard-main[data-active-view="activity"] .shopping-pane {
+    display: none;
+  }
+
+  .inventory-pane {
+    min-width: 0;
+    padding: 34px 0 0;
+  }
+
+  .inventory-header {
     align-items: flex-start;
     flex-direction: column;
     gap: 20px;
@@ -1200,21 +1212,19 @@ label {
     grid-row: 1 / span 2;
   }
 
-  .receipt-section {
-    position: static;
-    min-height: 0;
-    padding: 0;
-  }
-
-  .mobile-queue-view {
+  .shopping-pane {
+    border-left: 0;
+    background: transparent;
     padding-top: 37px;
   }
 
-  .mobile-queue-view .receipt-section {
-    padding-bottom: 25px;
+  .receipt-section {
+    position: static;
+    min-height: 0;
+    padding: 0 0 25px;
   }
 
-  .mobile-activity-view .activity-section {
+  .dashboard-main[data-active-view="activity"] .activity-section {
     margin-top: 0;
     padding-top: 0;
     border-top: 0;
@@ -1304,7 +1314,7 @@ label {
     height: 35px;
   }
 
-  .mobile-dashboard {
+  .dashboard-main {
     padding-right: 17px;
     padding-left: 17px;
   }
@@ -1320,7 +1330,7 @@ label {
     padding-left: 17px;
   }
 
-  .mobile-view {
+  .inventory-pane {
     padding-top: 28px;
   }
 

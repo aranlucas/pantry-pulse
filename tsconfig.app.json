@@ -18,5 +18,5 @@
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/client"]
+  "include": ["src/client", "test/client-dashboard.test.tsx", "test/client-motion.test.ts"]
 }
