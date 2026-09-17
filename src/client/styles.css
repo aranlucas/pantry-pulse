@@ -190,68 +190,6 @@ label {
   min-width: 0;
 }
 
-.station-status {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  color: var(--muted);
-}
-
-.station-status > svg {
-  flex: 0 0 auto;
-}
-
-.station-status.is-online > svg {
-  color: var(--spinach);
-}
-
-.station-status.is-offline > svg {
-  color: var(--tomato);
-}
-
-.station-status.is-unknown > svg {
-  color: var(--muted);
-}
-
-.station-indicator {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--tomato);
-}
-
-.is-online .station-indicator {
-  background: var(--spinach);
-}
-
-.is-unknown .station-indicator {
-  background: var(--muted);
-}
-
-.station-copy {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-  line-height: 1.15;
-}
-
-.station-copy strong {
-  color: var(--charcoal);
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.station-copy span {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .icon-button,
 .quantity-button {
   display: inline-grid;
@@ -1089,15 +1027,6 @@ label {
 
   .header-actions {
     gap: 8px;
-  }
-
-  .header-actions .station-status {
-    gap: 7px;
-    max-width: 122px;
-  }
-
-  .header-actions .station-copy {
-    display: grid;
   }
 
   .header-lock {
