@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # The Cloudflare Vitest pool currently supports Vitest 4 only.
+    ignore:
+      - dependency-name: vitest
+        versions: [">=5"]
     groups:
       production-dependencies:
         dependency-type: production
