@@ -87,16 +87,16 @@ pnpm deploy
 
 ## Source map
 
-| Path | Responsibility |
-| --- | --- |
-| `src/worker.ts` | Worker entry point, security headers, `/health`, API/MCP dispatch, and scheduled pruning. |
-| `src/server/http.ts` | Authenticated REST routes for the dashboard and device scans. |
-| `src/server/repository.ts` | D1 reads/writes, idempotent inventory events, snapshots, and retention. |
-| `src/server/mcp.ts` | Read and write MCP tool registration and result schemas. |
-| `src/client/` | Vite/React dashboard, session token handling, inventory views, and API client. |
-| `migrations/` and `scripts/seed.sql` | D1 schema and optional local/remote sample data. |
-| `firmware/esp32-rfid/` | PlatformIO firmware and wiring/configuration reference. |
-| `wrangler.jsonc` | Worker, D1, rate-limit, static asset, observability, and cron bindings. |
+| Path                                 | Responsibility                                                                            |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `src/worker.ts`                      | Worker entry point, security headers, `/health`, API/MCP dispatch, and scheduled pruning. |
+| `src/server/http.ts`                 | Authenticated REST routes for the dashboard and device scans.                             |
+| `src/server/repository.ts`           | D1 reads/writes, idempotent inventory events, snapshots, and retention.                   |
+| `src/server/mcp.ts`                  | Read and write MCP tool registration and result schemas.                                  |
+| `src/client/`                        | Vite/React dashboard, session token handling, inventory views, and API client.            |
+| `migrations/` and `scripts/seed.sql` | D1 schema and optional local/remote sample data.                                          |
+| `firmware/esp32-rfid/`               | PlatformIO firmware and wiring/configuration reference.                                   |
+| `wrangler.jsonc`                     | Worker, D1, rate-limit, static asset, observability, and cron bindings.                   |
 
 Design files under [`docs/design/`](docs/design/) are exploratory concepts and are labeled as such; they are not screenshots of a running deployment.
 
