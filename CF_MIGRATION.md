@@ -26,3 +26,8 @@ Vite builds, workspace roots, or OpenNext would otherwise bypass Worker packagin
 This produces cf’s Build Output Specification for `cf deploy --prebuilt`.
 D1 migration directories remain configured in the retained Wrangler inputs used
 by the existing database scripts.
+
+Local development also explicitly selects Wrangler for the Worker. `cf dev`
+autodetects the frontend-only Vite configuration, so it cannot start the separate
+Worker required by the Vite proxy on port 8787. Wrangler reads the migrated
+`cloudflare.config.ts` through `--experimental-new-config`.

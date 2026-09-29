@@ -14,7 +14,7 @@
     "db:seed:local": "wrangler d1 execute pantry-pulse --local --file scripts/seed.sql",
     "db:seed:remote": "wrangler d1 execute pantry-pulse --remote --file scripts/seed.sql",
     "deploy": "pnpm build && pnpm build:worker && cf deploy --prebuilt",
-    "dev": "concurrently --kill-others-on-fail --names web,worker 'vite --host 127.0.0.1' 'cf dev --port 8787'",
+    "dev": "concurrently --kill-others-on-fail --names web,worker 'vite --host 127.0.0.1' 'wrangler dev --experimental-new-config --port 8787'",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --deny-warnings .",

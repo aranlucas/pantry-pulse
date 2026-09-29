@@ -46,7 +46,7 @@ pnpm db:seed:local
 pnpm dev
 ```
 
-`pnpm dev` runs Vite and `cf dev` together. Open the Vite URL printed by the command (normally `http://localhost:5173`); its `/api`, `/health`, and `/mcp` requests proxy to the Worker on port `8787`. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+`pnpm dev` runs Vite and `wrangler dev --experimental-new-config` together. Open the Vite URL printed by the command (normally `http://localhost:5173`); its `/api`, `/health`, and `/mcp` requests proxy to the Worker on port `8787`. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
 
 For a deployed D1 database, review the migration and run the remote commands explicitly:
 
