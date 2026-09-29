@@ -46,7 +46,7 @@ pnpm db:seed:local
 pnpm dev
 ```
 
-`pnpm dev` runs Vite and `wrangler dev` together. Open the Vite URL printed by the command (normally `http://localhost:5173`); its `/api`, `/health`, and `/mcp` requests proxy to the Worker on port `8787`. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+`pnpm dev` runs Vite and `wrangler dev --experimental-new-config` together. Open the Vite URL printed by the command (normally `http://localhost:5173`); its `/api`, `/health`, and `/mcp` requests proxy to the Worker on port `8787`. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
 
 For a deployed D1 database, review the migration and run the remote commands explicitly:
 
@@ -96,7 +96,7 @@ pnpm deploy
 | `src/client/`                        | Vite/React dashboard, session token handling, inventory views, and API client.            |
 | `migrations/` and `scripts/seed.sql` | D1 schema and optional local/remote sample data.                                          |
 | `firmware/esp32-rfid/`               | PlatformIO firmware and wiring/configuration reference.                                   |
-| `wrangler.jsonc`                     | Worker, D1, rate-limit, static asset, observability, and cron bindings.                   |
+| `cloudflare.config.ts`               | Worker, D1, rate-limit, static asset, observability, and cron bindings.                   |
 
 Design files under [`docs/design/`](docs/design/) are exploratory concepts and are labeled as such; they are not screenshots of a running deployment.
 
