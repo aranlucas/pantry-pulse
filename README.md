@@ -103,5 +103,3 @@ Design files under [`docs/design/`](docs/design/) are exploratory concepts and a
 ## Status and security
 
 The Worker, dashboard, tests, D1 schema, MCP surface, and reference firmware are present. Hardware and Cloudflare resources still need to be provisioned by the operator. Keep `.dev.vars`, `config.h`, Wi-Fi credentials, TLS material, and all bearer tokens out of Git. See [`SECURITY.md`](SECURITY.md) for private vulnerability reporting and token responsibilities.
-
-See [Cloudflare CLI migration](CF_MIGRATION.md) for cf deployment and compatibility details.
