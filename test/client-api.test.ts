@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { quantityCorrection } from "../src/client/link-form";
 import { activityWasConsumed, decodeSnapshot } from "../src/client/snapshot";
 
 const workerSnapshot = {
@@ -113,5 +114,26 @@ describe("client snapshot contract", () => {
     expect(snapshot.shoppingQueue).toEqual([]);
     expect(snapshot.recentActivity).toEqual([]);
     expect(snapshot).not.toHaveProperty("station");
+  });
+});
+
+describe("link form stock corrections", () => {
+  it("leaves quantity out of metadata-only saves, including blank and unchanged zero", () => {
+    expect(quantityCorrection("1", 1)).toEqual({ onHand: null });
+    expect(quantityCorrection("01", 1)).toEqual({ onHand: null });
+    expect(quantityCorrection("0", 0)).toEqual({ onHand: null });
+    expect(quantityCorrection("  ", 1)).toEqual({ onHand: null });
+  });
+
+  it("includes the original count only for an explicit correction, including zero", () => {
+    expect(quantityCorrection("4", 1)).toEqual({ onHand: 4, expectedQuantity: 1 });
+    expect(quantityCorrection("0", 1)).toEqual({ onHand: 0, expectedQuantity: 1 });
+    expect(quantityCorrection("1", 0)).toEqual({ onHand: 1, expectedQuantity: 0 });
+  });
+
+  it("still rejects invalid quantities before submitting a correction", () => {
+    for (const value of ["-1", "1.5", "invalid"]) {
+      expect(() => quantityCorrection(value, 1)).toThrow("On hand must be a whole number");
+    }
   });
 });

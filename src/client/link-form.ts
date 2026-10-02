@@ -1,4 +1,4 @@
-import type { InventoryItem } from "./types";
+import type { InventoryItem, LinkItemInput } from "./types";
 
 export type LinkFormState = {
   rfidUid: string;
@@ -40,4 +40,14 @@ export function nullableInteger(value: string, label: string): number | null {
     throw new Error(`${label} must be a whole number of zero or more.`);
   }
   return parsed;
+}
+
+/** Leave stock alone unless the user changed it from the drawer's original count. */
+export function quantityCorrection(
+  value: string,
+  originalQuantity: number | null,
+): Pick<LinkItemInput, "onHand" | "expectedQuantity"> {
+  const onHand = nullableInteger(value, "On hand");
+  if (onHand === null || onHand === originalQuantity) return { onHand: null };
+  return { onHand, expectedQuantity: originalQuantity ?? undefined };
 }

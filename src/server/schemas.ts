@@ -64,6 +64,7 @@ export const linkItemSchema = z
 export const dashboardLinkItemSchema = linkItemSchema.extend({
   name: z.string().trim().min(1).max(120).optional(),
   unit: z.union([z.string().trim().min(1).max(32), z.null()]).optional(),
+  expectedQuantity: z.number().int().min(0).max(100_000).optional(),
   onHand: z.union([z.number().int().min(0).max(100_000), z.null()]).optional(),
   target: z.union([z.number().int().min(0).max(100_000), z.null()]).optional(),
 });

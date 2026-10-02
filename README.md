@@ -22,6 +22,12 @@ _Concept artwork from `docs/design/`; it illustrates the intended station, not a
 
 The admin API also supports snapshots, item creation, inventory adjustments, and tag/catalog links. `/health` checks the D1 binding. Device requests are rate limited.
 
+### Linking and stock corrections
+
+`POST /api/items/:id/link` changes only supplied metadata fields. Omitted fields are preserved; a `null` RFID or catalog field clears that link, while `null` `unit`, `target`, or `onHand` leaves the existing value unchanged. Catalog provider and item ID must form a complete pair after the update.
+
+A non-null `onHand` is an absolute stock correction. Send `expectedQuantity` with the count the editor originally displayed to reject stale edits with `409 inventory_conflict`. If it is omitted, the command checks the count read when the request starts. The stock change, metadata, and inventory event commit together, or none do. On conflict, refresh the pantry and reopen the item before retrying. The dashboard sends a correction only when its on-hand field changed; MCP metadata linking never changes stock.
+
 ## Local development
 
 Requirements:

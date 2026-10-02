@@ -246,6 +246,11 @@ export async function applyAdjustment(
   };
 }
 
+/**
+ * Patch supplied metadata only. A non-null quantity is an absolute correction:
+ * compare against expectedQuantity (or the count read at command start for older
+ * callers), then write metadata, stock, and its journal entry atomically.
+ */
 export async function linkItem(
   db: D1Database,
   itemId: string,
@@ -256,6 +261,7 @@ export async function linkItem(
     name?: string;
     unit?: string | null;
     quantity?: number | null;
+    expectedQuantity?: number;
     targetQuantity?: number | null;
   },
 ): Promise<PantryItem> {
@@ -264,65 +270,85 @@ export async function linkItem(
     throw new PantryError("Inventory item not found", 404, "item_not_found");
   }
 
-  const rfidUid = patch.rfidUid === undefined ? existing.rfidUid : patch.rfidUid;
-  const catalogProvider =
-    patch.catalogProvider === undefined ? existing.catalogProvider : patch.catalogProvider;
-  const providerItemId =
-    patch.providerItemId === undefined ? existing.providerItemId : patch.providerItemId;
-  const name = patch.name ?? existing.name;
-  const unit = patch.unit ?? existing.unit;
-  const quantity = patch.quantity ?? existing.quantity;
-  const targetQuantity = patch.targetQuantity ?? existing.targetQuantity;
+  // Only explicitly supplied fields belong to this patch. In particular, linking
+  // metadata must never write quantity or restore unrelated fields from a read.
+  const assignments: string[] = [];
+  const values: (string | number | null)[] = [];
+  const set = (column: string, value: string | number | null): void => {
+    assignments.push(`${column} = ?`);
+    values.push(value);
+  };
+  if (patch.name !== undefined) set("name", patch.name);
+  if (patch.unit != null) set("unit", patch.unit);
+  if (patch.targetQuantity != null) set("target_quantity", patch.targetQuantity);
+  if (patch.rfidUid !== undefined) set("rfid_uid", patch.rfidUid);
+  if (patch.catalogProvider !== undefined) set("catalog_provider", patch.catalogProvider);
+  if (patch.providerItemId !== undefined) set("provider_item_id", patch.providerItemId);
 
-  if ((catalogProvider === null) !== (providerItemId === null)) {
-    throw new PantryError(
-      "Catalog provider and provider item ID must be linked or cleared together",
-      422,
-      "incomplete_catalog_link",
-    );
-  }
+  const expectedQuantity = patch.expectedQuantity ?? existing.quantity;
+  const correctingQuantity = patch.quantity != null;
+  if (correctingQuantity) set("quantity", patch.quantity!);
+  assignments.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
+  values.push(itemId);
+  if (correctingQuantity) values.push(expectedQuantity);
 
   try {
-    const statements: D1PreparedStatement[] = [
-      db
-        .prepare(
-          `UPDATE items
-           SET name = ?,
-               unit = ?,
-               quantity = ?,
-               target_quantity = ?,
-               rfid_uid = ?,
-               catalog_provider = ?,
-               provider_item_id = ?,
-               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-           WHERE id = ?`,
-        )
-        .bind(
-          name,
-          unit,
-          quantity,
-          targetQuantity,
-          rfidUid,
-          catalogProvider,
-          providerItemId,
-          itemId,
-        ),
-    ];
-    if (quantity !== existing.quantity) {
+    const statements: D1PreparedStatement[] = [];
+    if (correctingQuantity) {
+      // The event and update have the same compare-and-set condition and execute
+      // in one D1 transaction. A stale correction writes neither one. Compute the
+      // delta from the matched database row, not an unprotected earlier snapshot.
       statements.push(
         db
           .prepare(
             `INSERT INTO inventory_events
               (id, item_id, delta, source, reason, applied_at)
-             VALUES (?, ?, ?, 'admin', 'dashboard setup', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+             SELECT ?, id, ? - quantity, 'admin', 'dashboard setup',
+                    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+             FROM items
+             WHERE id = ? AND quantity = ? AND quantity != ?`,
           )
-          .bind(`evt-${crypto.randomUUID()}`, itemId, quantity - existing.quantity),
+          .bind(
+            `evt-${crypto.randomUUID()}`,
+            patch.quantity,
+            itemId,
+            expectedQuantity,
+            patch.quantity,
+          ),
       );
     }
-    await db.batch(statements);
+    statements.push(
+      db
+        .prepare(
+          `UPDATE items SET ${assignments.join(", ")}
+           WHERE id = ?${correctingQuantity ? " AND quantity = ?" : ""}`,
+        )
+        .bind(...values),
+    );
+    const results = await db.batch(statements);
+    if (changes(results[results.length - 1]!) === 0) {
+      throw new PantryError(
+        "Inventory changed before this correction completed. Refresh the pantry and try again.",
+        409,
+        "inventory_conflict",
+      );
+    }
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw new PantryError("That RFID tag is already linked to another item", 409, "tag_in_use");
+    }
+    // Validate the effective provider pair inside the transaction, so concurrent
+    // linking/clearing cannot invalidate a check made against an earlier read.
+    if (
+      error instanceof Error &&
+      error.message.includes("CHECK constraint failed") &&
+      error.message.includes("catalog_provider")
+    ) {
+      throw new PantryError(
+        "Catalog provider and provider item ID must be linked or cleared together",
+        422,
+        "incomplete_catalog_link",
+      );
     }
     throw error;
   }

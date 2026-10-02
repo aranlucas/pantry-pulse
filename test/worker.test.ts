@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleApi } from "../src/server/http";
-import { pruneInventoryEvents } from "../src/server/repository";
+import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "../src/server/repository";
 import type { PantryEnv } from "../src/server/types";
 
 const adminToken = "test-admin-token-with-enough-entropy";
@@ -70,6 +70,33 @@ async function mcpJson(response: Response): Promise<unknown> {
     ?.slice(6);
   if (!data) throw new Error("MCP response did not contain an SSE data event");
   return JSON.parse(data);
+}
+
+// Hold one repository command immediately before its D1 transaction, while other
+// commands continue against the same real test database.
+function pausedBatch(db: D1Database) {
+  let entered!: () => void;
+  let release!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const resumed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const paused = new Proxy(db, {
+    get(target, property) {
+      if (property === "batch") {
+        return async (statements: D1PreparedStatement[]) => {
+          entered();
+          await resumed;
+          return target.batch(statements);
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return { db: paused, ready, release };
 }
 
 describe("Pantry Pulse Worker", () => {
@@ -309,6 +336,253 @@ describe("Pantry Pulse Worker", () => {
     expect(
       await env.DB.prepare("SELECT delta, reason FROM inventory_events").first(),
     ).toMatchObject({ delta: 3, reason: "dashboard setup" });
+  });
+
+  it("preserves an intervening RFID decrement and unrelated metadata when linking", async () => {
+    const paused = pausedBatch(env.DB);
+    const pending = linkItem(paused.db, "itm-coffee", { name: "House coffee" });
+    await paused.ready;
+    try {
+      await applyAdjustment(env.DB, {
+        eventId: "evt-link-race-device",
+        itemId: "itm-coffee",
+        delta: -1,
+        source: "device",
+        reason: "RFID consume",
+        deviceId: "test-station",
+      });
+      await linkItem(env.DB, "itm-coffee", { unit: "jar", targetQuantity: 7 });
+    } finally {
+      paused.release();
+    }
+    expect(await pending).toMatchObject({
+      name: "House coffee",
+      quantity: 0,
+      unit: "jar",
+      targetQuantity: 7,
+    });
+    expect(await env.DB.prepare("SELECT delta, source FROM inventory_events").all()).toMatchObject({
+      results: [{ delta: -1, source: "device" }],
+    });
+  });
+
+  it("rejects a stock correction overtaken by a device adjustment without partial edits", async () => {
+    const paused = pausedBatch(env.DB);
+    const pending = linkItem(paused.db, "itm-coffee", { name: "Stale name", quantity: 4 });
+    const rejected = expect(pending).rejects.toMatchObject({
+      status: 409,
+      code: "inventory_conflict",
+    });
+    await paused.ready;
+    try {
+      await applyAdjustment(env.DB, {
+        eventId: "evt-correction-race",
+        itemId: "itm-coffee",
+        delta: -1,
+        source: "device",
+        reason: "RFID consume",
+      });
+    } finally {
+      paused.release();
+    }
+    await rejected;
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
+      name: "Coffee beans",
+      quantity: 0,
+    });
+    expect(await env.DB.prepare("SELECT delta, source FROM inventory_events").all()).toMatchObject({
+      results: [{ delta: -1, source: "device" }],
+    });
+  });
+
+  it("rejects one of two overlapping absolute corrections", async () => {
+    const paused = pausedBatch(env.DB);
+    const pending = linkItem(paused.db, "itm-coffee", { quantity: 4 });
+    const rejected = expect(pending).rejects.toMatchObject({
+      status: 409,
+      code: "inventory_conflict",
+    });
+    await paused.ready;
+    try {
+      expect(await linkItem(env.DB, "itm-coffee", { quantity: 3 })).toMatchObject({ quantity: 3 });
+    } finally {
+      paused.release();
+    }
+    await rejected;
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 3 });
+    expect(await env.DB.prepare("SELECT delta, reason FROM inventory_events").all()).toMatchObject({
+      results: [{ delta: 2, reason: "dashboard setup" }],
+    });
+  });
+
+  it("rejects a stale dashboard count even if the device changed it before the request", async () => {
+    const scan = await postJson("/api/device/scans", deviceToken, {
+      eventId: "evt-dashboard-stale-count",
+      tagUid: "A1B2C3D4",
+      mode: "consume",
+    });
+    expect(scan.status).toBe(201);
+    const correction = await postJson("/api/items/itm-coffee/link", adminToken, {
+      name: "Stale edit",
+      onHand: 4,
+      expectedQuantity: 1,
+    });
+    expect(correction.status).toBe(409);
+    expect(await correction.json()).toMatchObject({ error: { code: "inventory_conflict" } });
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
+      name: "Coffee beans",
+      quantity: 0,
+    });
+    expect(await env.DB.prepare("SELECT delta FROM inventory_events").all()).toMatchObject({
+      results: [{ delta: -1 }],
+    });
+  });
+
+  it("returns one success and one conflict for dashboard corrections from the same count", async () => {
+    const responses = await Promise.all([
+      postJson("/api/items/itm-coffee/link", adminToken, { onHand: 3, expectedQuantity: 1 }),
+      postJson("/api/items/itm-coffee/link", adminToken, { onHand: 4, expectedQuantity: 1 }),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const item = await getItem(env.DB, "itm-coffee");
+    expect([3, 4]).toContain(item?.quantity);
+    expect(await env.DB.prepare("SELECT delta FROM inventory_events").all()).toMatchObject({
+      results: [{ delta: item!.quantity - 1 }],
+    });
+  });
+
+  it("preserves zero corrections and avoids journal entries for unchanged counts", async () => {
+    const unchanged = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 1,
+      expectedQuantity: 1,
+    });
+    expect(unchanged.status).toBe(200);
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first(),
+    ).toMatchObject({ count: 0 });
+    const correction = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 0,
+      expectedQuantity: 1,
+    });
+    expect(correction.status).toBe(200);
+    expect(await correction.json()).toMatchObject({ item: { quantity: 0 } });
+    expect(await env.DB.prepare("SELECT delta FROM inventory_events").all()).toMatchObject({
+      results: [{ delta: -1 }],
+    });
+  });
+
+  it("rolls back the correction journal when linking an already-used RFID tag", async () => {
+    const response = await postJson("/api/items/itm-oats/link", adminToken, {
+      rfidUid: "A1B2C3D4",
+      onHand: 4,
+      expectedQuantity: 2,
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "tag_in_use" } });
+    expect(await getItem(env.DB, "itm-oats")).toMatchObject({ quantity: 2, rfidUid: null });
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first(),
+    ).toMatchObject({ count: 0 });
+  });
+
+  it("does not recreate catalog references cleared during an unrelated metadata patch", async () => {
+    await linkItem(env.DB, "itm-coffee", { catalogProvider: "grocer", providerItemId: "sku-1" });
+    const paused = pausedBatch(env.DB);
+    const pending = linkItem(paused.db, "itm-coffee", { rfidUid: "DEADBEEF" });
+    await paused.ready;
+    try {
+      await linkItem(env.DB, "itm-coffee", { catalogProvider: null, providerItemId: null });
+    } finally {
+      paused.release();
+    }
+    expect(await pending).toMatchObject({
+      rfidUid: "DEADBEEF",
+      catalogProvider: null,
+      providerItemId: null,
+      quantity: 1,
+    });
+  });
+
+  it("validates partial catalog edits against the pair at commit time", async () => {
+    await linkItem(env.DB, "itm-coffee", { catalogProvider: "grocer", providerItemId: "sku-1" });
+    const paused = pausedBatch(env.DB);
+    const pending = linkItem(paused.db, "itm-coffee", {
+      catalogProvider: "new-grocer",
+      quantity: 3,
+    });
+    const rejected = expect(pending).rejects.toMatchObject({
+      status: 422,
+      code: "incomplete_catalog_link",
+    });
+    await paused.ready;
+    try {
+      await linkItem(env.DB, "itm-coffee", { catalogProvider: null, providerItemId: null });
+    } finally {
+      paused.release();
+    }
+    await rejected;
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
+      catalogProvider: null,
+      providerItemId: null,
+      quantity: 1,
+    });
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first(),
+    ).toMatchObject({ count: 0 });
+  });
+
+  it("links and clears metadata through MCP without changing stock or its journal", async () => {
+    const linked = await mcpRequest(
+      "tools/call",
+      {
+        name: "pantry_link_item",
+        arguments: { itemId: "itm-coffee", catalogProvider: "grocer", providerItemId: "sku-1" },
+      },
+      10,
+    );
+    expect(linked.status).toBe(200);
+    expect(await mcpJson(linked)).toMatchObject({
+      result: {
+        structuredContent: {
+          item: {
+            quantity: 1,
+            catalogProvider: "grocer",
+            providerItemId: "sku-1",
+          },
+        },
+      },
+    });
+    const incomplete = await mcpRequest(
+      "tools/call",
+      {
+        name: "pantry_link_item",
+        arguments: { itemId: "itm-coffee", catalogProvider: null },
+      },
+      11,
+    );
+    expect(await mcpJson(incomplete)).toMatchObject({ result: { isError: true } });
+    const cleared = await mcpRequest(
+      "tools/call",
+      {
+        name: "pantry_link_item",
+        arguments: { itemId: "itm-coffee", catalogProvider: null, providerItemId: null },
+      },
+      12,
+    );
+    expect(await mcpJson(cleared)).toMatchObject({
+      result: {
+        structuredContent: {
+          item: {
+            quantity: 1,
+            catalogProvider: null,
+            providerItemId: null,
+          },
+        },
+      },
+    });
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first(),
+    ).toMatchObject({ count: 0 });
   });
 
   it("publishes annotated MCP tools and executes pantry reads", async () => {
