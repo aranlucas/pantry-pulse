@@ -1370,3 +1370,34 @@ label {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Ledger status and scan metadata remain readable in the compact view. */
+.stock-status,
+.have-target-cell,
+.activity-source,
+.activity-time,
+.receipt-total {
+  font-size: 12px;
+}
+.ledger-column-labels,
+.activity-table-head {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+.item-name-group span,
+.activity-item small {
+  font-size: 11px;
+}
+.quantity-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+.quantity-output {
+  min-height: 44px;
+}
+a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
