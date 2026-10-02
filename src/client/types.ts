@@ -56,6 +56,7 @@ export type LinkItemInput = {
   name: string;
   unit: string;
   onHand: number | null;
+  expectedQuantity?: number;
   target: number | null;
   catalogProvider: string;
   providerItemId: string;

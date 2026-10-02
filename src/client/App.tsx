@@ -7,7 +7,13 @@ import { adjustItem, fetchSnapshot, isAuthError, linkItem } from "./api";
 import { Spinner } from "./chrome";
 import { Dashboard } from "./Dashboard";
 import { errorMessage } from "./format";
-import { EMPTY_LINK_FORM, formFromItem, nullableInteger, type LinkFormState } from "./link-form";
+import {
+  EMPTY_LINK_FORM,
+  formFromItem,
+  nullableInteger,
+  quantityCorrection,
+  type LinkFormState,
+} from "./link-form";
 import { LinkTagDrawer } from "./LinkTagDrawer";
 import { scrollDashboardToView } from "./motion";
 import { clearSessionToken, readSessionToken, writeSessionToken } from "./session";
@@ -31,6 +37,7 @@ export function App(): ReactNode {
   const [drawerBusy, setDrawerBusy] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [linkTargetId, setLinkTargetId] = useState("");
+  const [linkOriginalQuantity, setLinkOriginalQuantity] = useState<number | null>(null);
   const [linkForm, setLinkForm] = useState<LinkFormState>(EMPTY_LINK_FORM);
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -152,6 +159,7 @@ export function App(): ReactNode {
       snapshot?.items[0];
     setLinkTargetId(selected?.id ?? "");
     setLinkForm(formFromItem(selected));
+    setLinkOriginalQuantity(selected?.quantity ?? null);
     setDrawerError(null);
     setDrawerOpen(true);
   };
@@ -160,6 +168,7 @@ export function App(): ReactNode {
     const selected = snapshot?.items.find((item) => item.id === itemId);
     setLinkTargetId(itemId);
     setLinkForm(formFromItem(selected));
+    setLinkOriginalQuantity(selected?.quantity ?? null);
     setDrawerError(null);
   };
 
@@ -174,10 +183,10 @@ export function App(): ReactNode {
       setDrawerError("Enter the RFID tag UID.");
       return;
     }
-    let onHand: number | null;
+    let correction: Pick<LinkItemInput, "onHand" | "expectedQuantity">;
     let target: number | null;
     try {
-      onHand = nullableInteger(linkForm.onHand, "On hand");
+      correction = quantityCorrection(linkForm.onHand, linkOriginalQuantity);
       target = nullableInteger(linkForm.target, "Target");
     } catch (failure: unknown) {
       setDrawerError(errorMessage(failure, "Check the item quantities."));
@@ -191,7 +200,7 @@ export function App(): ReactNode {
         rfidUid: linkForm.rfidUid.trim(),
         name: linkForm.name.trim(),
         unit: linkForm.unit.trim(),
-        onHand,
+        ...correction,
         target,
         catalogProvider: linkForm.catalogProvider.trim(),
         providerItemId: linkForm.providerItemId.trim(),

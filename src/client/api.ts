@@ -102,6 +102,7 @@ export async function linkItem(token: string, itemId: string, input: LinkItemInp
       name: input.name,
       unit: input.unit || null,
       onHand: input.onHand,
+      expectedQuantity: input.expectedQuantity,
       target: input.target,
       catalogProvider: input.catalogProvider || null,
       providerItemId: input.providerItemId || null,
