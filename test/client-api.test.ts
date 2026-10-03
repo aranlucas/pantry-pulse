@@ -137,3 +137,29 @@ describe("link form stock corrections", () => {
     }
   });
 });
+
+describe("tolerant snapshot boundary", () => {
+  it("preserves numeric strings, empty identifiers and fallback values", () => {
+    const snapshot = decodeSnapshot({
+      generatedAt: "known-time",
+      summary: { itemCount: "0x10", lowStockCount: "  ", unitsNeeded: "Infinity" },
+      items: [{ id: "", name: null, quantity: " 2.5 ", targetQuantity: false, rfidUid: "" }, null],
+      shoppingQueue: [false],
+      recentActivity: [{ eventId: "", source: "other", delta: "-2", createdAt: "known-time" }],
+    });
+
+    expect(snapshot.summary).toEqual({ itemCount: 16, lowStockCount: 0, unitsNeeded: 0 });
+    expect(snapshot.items[0]).toMatchObject({
+      id: "",
+      name: "Unnamed item",
+      quantity: 2.5,
+      targetQuantity: 0,
+      rfidUid: null,
+    });
+    expect(snapshot.items[1]).toMatchObject({ id: "item-2", quantity: 0 });
+    expect(snapshot.shoppingQueue[0]).toMatchObject({ itemId: "queue-1" });
+    expect(snapshot.recentActivity[0]).toMatchObject({ eventId: "", source: "admin", delta: -2 });
+    expect(decodeSnapshot(null).items).toEqual([]);
+    expect(decodeSnapshot([]).shoppingQueue).toEqual([]);
+  });
+});

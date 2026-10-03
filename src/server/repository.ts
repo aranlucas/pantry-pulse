@@ -48,7 +48,7 @@ export interface AdjustmentResult {
 }
 
 function changes(result: D1Result): number {
-  return typeof result.meta.changes === "number" ? result.meta.changes : 0;
+  return result.meta.changes ?? 0;
 }
 
 async function getEvent(db: D1Database, eventId: string): Promise<EventRow | null> {
@@ -67,6 +67,7 @@ async function getEvent(db: D1Database, eventId: string): Promise<EventRow | nul
     )
     .bind(eventId)
     .first<EventRow>();
+
   if (active) return active;
 
   return db
@@ -141,6 +142,7 @@ export async function createItem(
       )
       .bind(id, input.name, input.unit, input.quantity, input.targetQuantity, maxItems)
       .run();
+
     if (changes(insert) === 0) {
       throw new PantryError(`A pantry can contain at most ${maxItems} items`, 409, "item_limit");
     }
@@ -148,13 +150,16 @@ export async function createItem(
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw new PantryError("An item with that ID already exists", 409, "item_exists");
     }
+
     throw error;
   }
 
   const created = await getItem(db, id);
+
   if (!created) {
     throw new Error("Created item could not be reloaded");
   }
+
   return created;
 }
 
@@ -163,24 +168,30 @@ export async function applyAdjustment(
   input: AdjustmentInput,
 ): Promise<AdjustmentResult> {
   const existing = await getEvent(db, input.eventId);
+
   if (existing) {
     assertMatchingEvent(existing, input);
     const item = await getItem(db, input.itemId);
+
     if (!item) {
       throw new PantryError("Inventory item not found", 404, "item_not_found");
     }
+
     return { item, eventId: input.eventId, idempotentReplay: true };
   }
 
   const item = await getItem(db, input.itemId);
+
   if (!item) {
     throw new PantryError("Inventory item not found", 404, "item_not_found");
   }
+
   if (item.quantity + input.delta < 0) {
     throw new PantryError("Inventory cannot be adjusted below zero", 409, "negative_inventory");
   }
 
   let results: D1Result[];
+
   try {
     results = await db.batch([
       db
@@ -225,16 +236,20 @@ export async function applyAdjustment(
         "inventory_conflict",
       );
     }
+
     throw error;
   }
 
   const stored = await getEvent(db, input.eventId);
+
   if (!stored) {
     throw new Error("Inventory event could not be reloaded");
   }
+
   assertMatchingEvent(stored, input);
 
   const updated = await getItem(db, input.itemId);
+
   if (!updated) {
     throw new Error("Adjusted item could not be reloaded");
   }
@@ -266,6 +281,7 @@ export async function linkItem(
   },
 ): Promise<PantryItem> {
   const existing = await getItem(db, itemId);
+
   if (!existing) {
     throw new PantryError("Inventory item not found", 404, "item_not_found");
   }
@@ -274,26 +290,36 @@ export async function linkItem(
   // metadata must never write quantity or restore unrelated fields from a read.
   const assignments: string[] = [];
   const values: (string | number | null)[] = [];
+
   const set = (column: string, value: string | number | null): void => {
     assignments.push(`${column} = ?`);
     values.push(value);
   };
+
   if (patch.name !== undefined) set("name", patch.name);
+
   if (patch.unit != null) set("unit", patch.unit);
+
   if (patch.targetQuantity != null) set("target_quantity", patch.targetQuantity);
+
   if (patch.rfidUid !== undefined) set("rfid_uid", patch.rfidUid);
+
   if (patch.catalogProvider !== undefined) set("catalog_provider", patch.catalogProvider);
+
   if (patch.providerItemId !== undefined) set("provider_item_id", patch.providerItemId);
 
   const expectedQuantity = patch.expectedQuantity ?? existing.quantity;
   const correctingQuantity = patch.quantity != null;
+
   if (correctingQuantity) set("quantity", patch.quantity!);
   assignments.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
   values.push(itemId);
+
   if (correctingQuantity) values.push(expectedQuantity);
 
   try {
     const statements: D1PreparedStatement[] = [];
+
     if (correctingQuantity) {
       // The event and update have the same compare-and-set condition and execute
       // in one D1 transaction. A stale correction writes neither one. Compute the
@@ -317,6 +343,7 @@ export async function linkItem(
           ),
       );
     }
+
     statements.push(
       db
         .prepare(
@@ -326,6 +353,7 @@ export async function linkItem(
         .bind(...values),
     );
     const results = await db.batch(statements);
+
     if (changes(results[results.length - 1]!) === 0) {
       throw new PantryError(
         "Inventory changed before this correction completed. Refresh the pantry and try again.",
@@ -337,6 +365,7 @@ export async function linkItem(
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw new PantryError("That RFID tag is already linked to another item", 409, "tag_in_use");
     }
+
     // Validate the effective provider pair inside the transaction, so concurrent
     // linking/clearing cannot invalidate a check made against an earlier read.
     if (
@@ -350,18 +379,21 @@ export async function linkItem(
         "incomplete_catalog_link",
       );
     }
+
     throw error;
   }
 
   const updated = await getItem(db, itemId);
+
   if (!updated) {
     throw new Error("Linked item could not be reloaded");
   }
+
   return updated;
 }
 
 export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
-  const queryResults = await db.batch([
+  const queryResults = await db.batch<PantryItem | InventoryActivity>([
     db.prepare(
       `SELECT ${itemColumns}
        FROM items
@@ -391,8 +423,13 @@ export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
 
   const itemsResult = queryResults[0]!;
   const activityResult = queryResults[1]!;
-  const items = itemsResult.results as unknown as PantryItem[];
-  const recentActivity = activityResult.results as unknown as InventoryActivity[];
+  // SAFETY: D1 batch preserves statement order; the first SELECT uses itemColumns,
+  // whose aliases and database columns exactly match PantryItem.
+  const items = itemsResult.results as PantryItem[];
+  // SAFETY: The second SELECT explicitly projects InventoryActivity columns and aliases;
+  // D1 returns its rows at batch index 1, without mixing the first statement’s rows.
+  const recentActivity = activityResult.results as InventoryActivity[];
+
   const shoppingQueue: ShoppingNeed[] = items
     .filter((item) => item.quantity < item.targetQuantity)
     .map((item) => ({
@@ -425,7 +462,9 @@ export async function pruneInventoryEvents(db: D1Database, retentionDays = 90): 
   if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 3650) {
     throw new Error("Invalid inventory event retention period");
   }
+
   const cutoff = `-${retentionDays} days`;
+
   const results = await db.batch([
     db
       .prepare(
@@ -443,6 +482,7 @@ export async function pruneInventoryEvents(db: D1Database, retentionDays = 90): 
       )
       .bind(cutoff),
   ]);
+
   return changes(results[1]!);
 }
 
@@ -450,5 +490,6 @@ export async function countEventTombstones(db: D1Database): Promise<number> {
   const result = await db
     .prepare("SELECT COUNT(*) AS count FROM event_tombstones")
     .first<{ count: number }>();
+
   return result?.count ?? 0;
 }

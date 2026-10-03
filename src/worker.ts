@@ -27,7 +27,9 @@ function secured(response: Response, includeCsp = false): Response {
   result.headers.set("Referrer-Policy", "no-referrer");
   result.headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
   result.headers.set("X-Frame-Options", "DENY");
+
   if (includeCsp) result.headers.set("Content-Security-Policy", contentSecurityPolicy);
+
   return result;
 }
 
@@ -74,6 +76,7 @@ export default {
         response = await handleApi(request, env);
       } else if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
         const access = await getMcpAccess(request, env);
+
         if (!access) {
           response = unauthorized();
         } else {
@@ -103,6 +106,7 @@ export default {
       status: response.status,
       durationMs: Date.now() - startedAt,
     });
+
     return response;
   },
   scheduled(_controller, env, ctx): void {

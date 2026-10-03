@@ -25,6 +25,7 @@ export function ActivitySection({ events }: { events: ActivityEvent[] }): ReactN
           </div>
           {events.map((event) => {
             const consumed = activityWasConsumed(event.delta);
+
             return (
               <div className="activity-row" role="row" key={event.eventId}>
                 <span

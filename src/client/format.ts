@@ -14,13 +14,17 @@ export function formatRfidUid(rfidUid: string | null): string {
 
 export function formatActivitySource(source: ActivityEvent["source"]): string {
   if (source === "device") return "RFID station";
+
   if (source === "mcp") return "MCP";
+
   return "Dashboard";
 }
 
 export function formatDate(value: string): string {
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return "Unknown time";
+
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -29,6 +33,6 @@ export function formatDate(value: string): string {
   }).format(date);
 }
 
-export function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+export function errorMessage(cause: unknown, fallback: string): string {
+  return cause instanceof Error && cause.message ? cause.message : fallback;
 }

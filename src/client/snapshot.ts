@@ -1,102 +1,100 @@
-import type {
-  ActivityEvent,
-  ApiRecord,
-  InventoryItem,
-  PantrySnapshot,
-  ShoppingItem,
-} from "./types";
+import { z } from "zod";
+import type { PantrySnapshot } from "./types";
 
-function asRecord(value: unknown): ApiRecord {
-  return typeof value === "object" && value !== null ? (value as ApiRecord) : {};
-}
+const text = z.string().catch("");
 
-function asString(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
-}
+const nullableText = z.string().min(1).nullable().catch(null);
 
-function asNullableString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
+const number = z
+  .union([
+    z.number(),
+    z
+      .string()
+      .refine((value) => value.trim() !== "")
+      .transform(Number)
+      .pipe(z.number()),
+  ])
+  .catch(0);
 
-function asNumber(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return fallback;
-}
+const identifier = z.string().optional().catch(undefined);
 
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
+const inventoryFields = z.object({
+  id: identifier,
+  name: z.string().catch("Unnamed item"),
+  unit: z.string().catch("item"),
+  quantity: number,
+  targetQuantity: number,
+  rfidUid: nullableText,
+  catalogProvider: nullableText,
+  providerItemId: nullableText,
+  createdAt: text,
+  updatedAt: text,
+});
 
-function decodeItem(value: unknown, index: number): InventoryItem {
-  const record = asRecord(value);
-  return {
-    id: asString(record.id, `item-${index + 1}`),
-    name: asString(record.name, "Unnamed item"),
-    unit: asString(record.unit, "item"),
-    quantity: asNumber(record.quantity),
-    targetQuantity: asNumber(record.targetQuantity),
-    rfidUid: asNullableString(record.rfidUid),
-    catalogProvider: asNullableString(record.catalogProvider),
-    providerItemId: asNullableString(record.providerItemId),
-    createdAt: asString(record.createdAt),
-    updatedAt: asString(record.updatedAt),
-  };
-}
+const inventorySchema = inventoryFields.catch(() => inventoryFields.parse({}));
 
-function decodeShoppingItem(value: unknown, index: number): ShoppingItem {
-  const record = asRecord(value);
-  return {
-    itemId: asString(record.itemId, `queue-${index + 1}`),
-    name: asString(record.name, "Unnamed item"),
-    unit: asString(record.unit, "item"),
-    quantityNeeded: asNumber(record.quantityNeeded),
-    catalogProvider: asNullableString(record.catalogProvider),
-    providerItemId: asNullableString(record.providerItemId),
-  };
-}
+const shoppingFields = z.object({
+  itemId: identifier,
+  name: z.string().catch("Unnamed item"),
+  unit: z.string().catch("item"),
+  quantityNeeded: number,
+  catalogProvider: nullableText,
+  providerItemId: nullableText,
+});
 
-function decodeActivitySource(value: unknown): ActivityEvent["source"] {
-  return value === "device" || value === "mcp" ? value : "admin";
-}
+const shoppingSchema = shoppingFields.catch(() => shoppingFields.parse({}));
 
-function decodeActivity(value: unknown, index: number): ActivityEvent {
-  const record = asRecord(value);
-  return {
-    eventId: asString(record.eventId, `event-${index + 1}`),
-    itemId: asString(record.itemId),
-    itemName: asString(record.itemName, "Unnamed item"),
-    rfidUid: asNullableString(record.rfidUid),
-    delta: asNumber(record.delta),
-    source: decodeActivitySource(record.source),
-    reason: asString(record.reason),
-    deviceId: asNullableString(record.deviceId),
-    createdAt: asString(record.createdAt, new Date().toISOString()),
-  };
-}
+const activityFields = z.object({
+  eventId: identifier,
+  itemId: text,
+  itemName: z.string().catch("Unnamed item"),
+  rfidUid: nullableText,
+  delta: number,
+  source: z.enum(["admin", "device", "mcp"]).catch("admin"),
+  reason: text,
+  deviceId: nullableText,
+  createdAt: z.string().catch(() => new Date().toISOString()),
+});
 
-function decodeSummary(value: unknown): PantrySnapshot["summary"] {
-  const record = asRecord(value);
-  return {
-    itemCount: asNumber(record.itemCount),
-    lowStockCount: asNumber(record.lowStockCount),
-    unitsNeeded: asNumber(record.unitsNeeded),
-  };
-}
+const activitySchema = activityFields.catch(() => activityFields.parse({}));
 
-export function decodeSnapshot(value: unknown): PantrySnapshot {
-  const record = asRecord(value);
-  return {
-    generatedAt: asString(record.generatedAt, new Date().toISOString()),
-    summary: decodeSummary(record.summary),
-    items: asArray(record.items).map(decodeItem),
-    shoppingQueue: asArray(record.shoppingQueue).map(decodeShoppingItem),
-    recentActivity: asArray(record.recentActivity).map(decodeActivity),
-  };
-}
+const summarySchema = z
+  .object({
+    itemCount: number,
+    lowStockCount: number,
+    unitsNeeded: number,
+  })
+  .catch({ itemCount: 0, lowStockCount: 0, unitsNeeded: 0 });
+
+const snapshotFields = z.object({
+  generatedAt: z.string().catch(() => new Date().toISOString()),
+  summary: summarySchema,
+  items: z
+    .array(inventorySchema)
+    .catch([])
+    .transform((items) =>
+      items.map((item, index) => ({ ...item, id: item.id ?? `item-${index + 1}` })),
+    ),
+  shoppingQueue: z
+    .array(shoppingSchema)
+    .catch([])
+    .transform((items) =>
+      items.map((item, index) => ({ ...item, itemId: item.itemId ?? `queue-${index + 1}` })),
+    ),
+  recentActivity: z
+    .array(activitySchema)
+    .catch([])
+    .transform((items) =>
+      items.map((item, index) => ({ ...item, eventId: item.eventId ?? `event-${index + 1}` })),
+    ),
+});
+
+/** Preserve the dashboard's documented tolerant boundary defaults. */
+export const snapshotSchema: z.ZodType<PantrySnapshot> = snapshotFields.catch(() =>
+  snapshotFields.parse({}),
+);
+
+export const decodeSnapshot = snapshotSchema.parse;
 
 export function activityWasConsumed(delta: number): boolean {
   return delta < 0;

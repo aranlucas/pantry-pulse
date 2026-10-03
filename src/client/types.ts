@@ -61,5 +61,3 @@ export type LinkItemInput = {
   catalogProvider: string;
   providerItemId: string;
 };
-
-export type ApiRecord = Record<string, unknown>;

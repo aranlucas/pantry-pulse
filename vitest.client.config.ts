@@ -5,6 +5,10 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "node",
-    include: ["test/client-dashboard.test.tsx", "test/client-motion.test.ts"],
+    include: [
+      "test/client-dashboard.test.tsx",
+      "test/client-motion.test.ts",
+      "test/client-http.test.ts",
+    ],
   },
 });

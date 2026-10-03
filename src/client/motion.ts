@@ -1,6 +1,7 @@
 import type { View } from "./types";
 
 export const DESKTOP_LAYOUT_QUERY = "(min-width: 821px)";
+
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 export function prefersReducedMotion(
@@ -30,6 +31,7 @@ export function scrollDashboardToView(
   if (isDesktop) {
     const getElementById = options.getElementById ?? ((id) => document.getElementById(id));
     getElementById(`${view}-view`)?.scrollIntoView({ behavior, block: "start" });
+
     return;
   }
 
