@@ -14,5 +14,5 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["src/worker.ts", "src/server/**/*.ts", "test/**/*.ts"],
-  "exclude": ["test/client-motion.test.ts"]
+  "exclude": ["test/client-motion.test.ts", "test/client-http.test.ts"]
 }

@@ -22,6 +22,7 @@ export const EMPTY_LINK_FORM: LinkFormState = {
 
 export function formFromItem(item: InventoryItem | undefined): LinkFormState {
   if (!item) return EMPTY_LINK_FORM;
+
   return {
     rfidUid: item.rfidUid ?? "",
     name: item.name,
@@ -36,9 +37,11 @@ export function formFromItem(item: InventoryItem | undefined): LinkFormState {
 export function nullableInteger(value: string, label: string): number | null {
   if (!value.trim()) return null;
   const parsed = Number(value);
+
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(`${label} must be a whole number of zero or more.`);
   }
+
   return parsed;
 }
 
@@ -48,6 +51,8 @@ export function quantityCorrection(
   originalQuantity: number | null,
 ): Pick<LinkItemInput, "onHand" | "expectedQuantity"> {
   const onHand = nullableInteger(value, "On hand");
+
   if (onHand === null || onHand === originalQuantity) return { onHand: null };
+
   return { onHand, expectedQuantity: originalQuantity ?? undefined };
 }

@@ -25,17 +25,18 @@ const adjustmentResultSchema = z.object({
   idempotentReplay: z.boolean(),
 });
 
-function result(value: unknown) {
+function result<T extends Record<string, unknown>>(value: T) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
-    structuredContent: value as Record<string, unknown>,
+    structuredContent: value,
   };
 }
 
-function toolError(error: unknown) {
-  if (!(error instanceof PantryError))
-    console.error("Unexpected Pantry Pulse MCP tool error", error);
-  const message = error instanceof PantryError ? error.message : "Pantry operation failed";
+function toolError(cause: unknown) {
+  if (!(cause instanceof PantryError))
+    console.error("Unexpected Pantry Pulse MCP tool error", cause);
+  const message = cause instanceof PantryError ? cause.message : "Pantry operation failed";
+
   return {
     isError: true,
     content: [{ type: "text" as const, text: message }],
@@ -93,7 +94,7 @@ export function createPantryMcpServer(env: PantryEnv, access: McpAccess): McpSer
     },
     async () => {
       try {
-        return result(await getSnapshot(env.DB));
+        return result({ ...(await getSnapshot(env.DB)) });
       } catch (error) {
         return toolError(error);
       }
@@ -122,6 +123,7 @@ export function createPantryMcpServer(env: PantryEnv, access: McpAccess): McpSer
     async ({ format }) => {
       try {
         const snapshot = await getSnapshot(env.DB);
+
         const text =
           format === "json"
             ? JSON.stringify(snapshot.shoppingQueue, null, 2)
@@ -130,6 +132,7 @@ export function createPantryMcpServer(env: PantryEnv, access: McpAccess): McpSer
               : snapshot.shoppingQueue
                   .map((item) => `- [ ] ${item.name} — ${item.quantityNeeded} ${item.unit}`)
                   .join("\n");
+
         return result({ format, itemCount: snapshot.shoppingQueue.length, text });
       } catch (error) {
         return toolError(error);
@@ -155,7 +158,7 @@ export function createPantryMcpServer(env: PantryEnv, access: McpAccess): McpSer
       },
       async (input) => {
         try {
-          return result(await applyAdjustment(env.DB, { ...input, source: "mcp" }));
+          return result({ ...(await applyAdjustment(env.DB, { ...input, source: "mcp" })) });
         } catch (error) {
           return toolError(error);
         }

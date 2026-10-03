@@ -46,6 +46,7 @@ export function App(): ReactNode {
     setSnapshot(next);
     setExpandedItemId((current) => {
       if (current && next.items.some((item) => item.id === current)) return current;
+
       return next.items[0]?.id ?? null;
     });
   }, []);
@@ -62,18 +63,20 @@ export function App(): ReactNode {
     setAuthState("locked");
   }, []);
 
-  const handleAuthFailure = useCallback((failure: unknown): void => {
+  const handleAuthFailure = useCallback((cause: unknown): void => {
     clearSessionToken();
     setToken(null);
     setSnapshot(null);
     setAuthState("locked");
-    setAuthError(errorMessage(failure, "That token did not unlock this pantry."));
+    setAuthError(errorMessage(cause, "That token did not unlock this pantry."));
   }, []);
 
   useEffect(() => {
     const savedToken = readSessionToken();
+
     if (!savedToken) {
       setAuthState("locked");
+
       return;
     }
 
@@ -85,9 +88,9 @@ export function App(): ReactNode {
         acceptSnapshot(next);
         setAuthState("ready");
       })
-      .catch((failure: unknown) => {
+      .catch((cause: unknown) => {
         if (cancelled) return;
-        handleAuthFailure(failure);
+        handleAuthFailure(cause);
       });
 
     return () => {
@@ -98,20 +101,24 @@ export function App(): ReactNode {
   const submitToken = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     const candidate = tokenInput.trim();
+
     if (!candidate) {
       setAuthError("Enter the admin token to continue.");
+
       return;
     }
+
     setAuthError(null);
     setAuthState("loading");
+
     try {
       const next = await fetchSnapshot(candidate);
       writeSessionToken(candidate);
       setToken(candidate);
       acceptSnapshot(next);
       setAuthState("ready");
-    } catch (failure: unknown) {
-      handleAuthFailure(failure);
+    } catch (cause: unknown) {
+      handleAuthFailure(cause);
     }
   };
 
@@ -119,13 +126,14 @@ export function App(): ReactNode {
     if (!token || refreshing) return;
     setRefreshing(true);
     setError(null);
+
     try {
       acceptSnapshot(await fetchSnapshot(token));
-    } catch (failure: unknown) {
-      if (isAuthError(failure)) {
-        handleAuthFailure(failure);
+    } catch (cause: unknown) {
+      if (isAuthError(cause)) {
+        handleAuthFailure(cause);
       } else {
-        setError(errorMessage(failure, "Could not refresh the pantry."));
+        setError(errorMessage(cause, "Could not refresh the pantry."));
       }
     } finally {
       setRefreshing(false);
@@ -137,15 +145,16 @@ export function App(): ReactNode {
     setPendingItemId(item.id);
     setError(null);
     setNotice(null);
+
     try {
       await adjustItem(token, item.id, delta);
       acceptSnapshot(await fetchSnapshot(token));
       setNotice(`${item.name} ${delta > 0 ? "restocked" : "used"}.`);
-    } catch (failure: unknown) {
-      if (isAuthError(failure)) {
-        handleAuthFailure(failure);
+    } catch (cause: unknown) {
+      if (isAuthError(cause)) {
+        handleAuthFailure(cause);
       } else {
-        setError(errorMessage(failure, "The pantry count could not be updated."));
+        setError(errorMessage(cause, "The pantry count could not be updated."));
       }
     } finally {
       setPendingItemId(null);
@@ -157,6 +166,7 @@ export function App(): ReactNode {
       snapshot?.items.find((item) => item.id === itemId) ??
       snapshot?.items.find((item) => !item.rfidUid) ??
       snapshot?.items[0];
+
     setLinkTargetId(selected?.id ?? "");
     setLinkForm(formFromItem(selected));
     setLinkOriginalQuantity(selected?.quantity ?? null);
@@ -174,27 +184,37 @@ export function App(): ReactNode {
 
   const submitLink = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+
     if (!token) return;
+
     if (!linkTargetId) {
       setDrawerError("Choose a pantry item before linking a tag.");
+
       return;
     }
+
     if (!linkForm.rfidUid.trim()) {
       setDrawerError("Enter the RFID tag UID.");
+
       return;
     }
+
     let correction: Pick<LinkItemInput, "onHand" | "expectedQuantity">;
     let target: number | null;
+
     try {
       correction = quantityCorrection(linkForm.onHand, linkOriginalQuantity);
       target = nullableInteger(linkForm.target, "Target");
-    } catch (failure: unknown) {
-      setDrawerError(errorMessage(failure, "Check the item quantities."));
+    } catch (cause: unknown) {
+      setDrawerError(errorMessage(cause, "Check the item quantities."));
+
       return;
     }
+
     setDrawerBusy(true);
     setDrawerError(null);
     setError(null);
+
     try {
       const input: LinkItemInput = {
         rfidUid: linkForm.rfidUid.trim(),
@@ -205,16 +225,17 @@ export function App(): ReactNode {
         catalogProvider: linkForm.catalogProvider.trim(),
         providerItemId: linkForm.providerItemId.trim(),
       };
+
       await linkItem(token, linkTargetId, input);
       acceptSnapshot(await fetchSnapshot(token));
       setDrawerOpen(false);
       setNotice(`${linkForm.name || "Item"} linked to the pantry station.`);
-    } catch (failure: unknown) {
-      if (isAuthError(failure)) {
-        handleAuthFailure(failure);
+    } catch (cause: unknown) {
+      if (isAuthError(cause)) {
+        handleAuthFailure(cause);
         setDrawerOpen(false);
       } else {
-        setDrawerError(errorMessage(failure, "The tag could not be linked."));
+        setDrawerError(errorMessage(cause, "The tag could not be linked."));
       }
     } finally {
       setDrawerBusy(false);

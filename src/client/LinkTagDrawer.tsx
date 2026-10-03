@@ -36,19 +36,25 @@ export function LinkTagDrawer({
     if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => firstFieldRef.current?.focus());
+
     const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
+
         return;
       }
+
       if (event.key !== "Tab") return;
+
       const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
         "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
       );
+
       if (!focusable?.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last?.focus();
@@ -57,8 +63,10 @@ export function LinkTagDrawer({
         first?.focus();
       }
     };
+
     document.addEventListener("keydown", handleKeyDown);
     document.body.classList.add("drawer-open");
+
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", handleKeyDown);

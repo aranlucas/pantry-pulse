@@ -15,7 +15,9 @@ export function ShoppingReceipt({ items }: { items: ShoppingItem[] }): ReactNode
           .map((item) => `- ${item.name}: ${formatQuantity(item.quantityNeeded, item.unit)}`)
           .join("\n")
       : "Pantry is fully stocked.";
+
     setCopyError(null);
+
     try {
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(text);

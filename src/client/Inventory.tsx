@@ -24,16 +24,23 @@ function isLowStock(item: InventoryItem): boolean {
 
 function progressFor(item: InventoryItem): number {
   if (item.targetQuantity <= 0) return item.quantity > 0 ? 100 : 0;
+
   return Math.min(100, Math.max(0, (item.quantity / item.targetQuantity) * 100));
 }
 
 function itemIconFor(name: string) {
   const normalized = name.toLowerCase();
+
   if (normalized.includes("milk")) return Milk;
+
   if (normalized.includes("bean")) return Bean;
+
   if (normalized.includes("coffee")) return Coffee;
+
   if (normalized.includes("rice") || normalized.includes("grain")) return Wheat;
+
   if (normalized.includes("soup") || normalized.includes("broth")) return Soup;
+
   return Package;
 }
 

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleApi } from "../src/server/http";
@@ -5,8 +7,11 @@ import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "../src
 import type { PantryEnv } from "../src/server/types";
 
 const adminToken = "test-admin-token-with-enough-entropy";
+
 const deviceToken = "test-device-token-with-enough-entropy";
+
 const mcpReadToken = "test-mcp-read-token-with-enough-entropy";
+
 const mcpWriteToken = "test-mcp-write-token-with-enough-entropy";
 
 function authorization(token: string): HeadersInit {
@@ -30,7 +35,7 @@ async function seedItems(): Promise<void> {
   ]);
 }
 
-async function postJson(path: string, token: string, data: unknown): Promise<Response> {
+async function postJson<T>(path: string, token: string, data: T): Promise<Response> {
   return SELF.fetch(`https://example.test${path}`, {
     method: "POST",
     headers: {
@@ -41,9 +46,9 @@ async function postJson(path: string, token: string, data: unknown): Promise<Res
   });
 }
 
-async function mcpRequest(
+async function mcpRequest<T>(
   method: string,
-  params: unknown,
+  params: T,
   id: number,
   token = mcpWriteToken,
 ): Promise<Response> {
@@ -59,17 +64,23 @@ async function mcpRequest(
   });
 }
 
-async function mcpJson(response: Response): Promise<unknown> {
+const jsonValueSchema = z.json();
+
+type JsonValue = z.infer<typeof jsonValueSchema>;
+
+async function mcpJson(response: Response): Promise<JsonValue> {
   if (response.headers.get("Content-Type")?.includes("application/json")) {
-    return response.json();
+    return z.json().parse(await response.json());
   }
 
   const data = (await response.text())
     .split("\n")
     .find((line) => line.startsWith("data: "))
     ?.slice(6);
+
   if (!data) throw new Error("MCP response did not contain an SSE data event");
-  return JSON.parse(data);
+
+  return z.json().parse(JSON.parse(data));
 }
 
 // Hold one repository command immediately before its D1 transaction, while other
@@ -77,25 +88,28 @@ async function mcpJson(response: Response): Promise<unknown> {
 function pausedBatch(db: D1Database) {
   let entered!: () => void;
   let release!: () => void;
+
   const ready = new Promise<void>((resolve) => {
     entered = resolve;
   });
+
   const resumed = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const paused = new Proxy(db, {
-    get(target, property) {
-      if (property === "batch") {
-        return async (statements: D1PreparedStatement[]) => {
-          entered();
-          await resumed;
-          return target.batch(statements);
-        };
-      }
-      const value = Reflect.get(target, property);
-      return typeof value === "function" ? value.bind(target) : value;
+
+  const paused: D1Database = {
+    prepare: db.prepare.bind(db),
+    exec: db.exec.bind(db),
+    withSession: db.withSession.bind(db),
+    dump: db.dump.bind(db),
+    async batch<T>(statements: D1PreparedStatement[]) {
+      entered();
+      await resumed;
+
+      return db.batch<T>(statements);
     },
-  });
+  };
+
   return { db: paused, ready, release };
 }
 
@@ -114,6 +128,7 @@ describe("Pantry Pulse Worker", () => {
     const allowed = await SELF.fetch("https://example.test/api/snapshot", {
       headers: authorization(adminToken),
     });
+
     expect(allowed.status).toBe(200);
     expect(await allowed.json()).toMatchObject({
       summary: { itemCount: 2, lowStockCount: 1, unitsNeeded: 1 },
@@ -139,6 +154,7 @@ describe("Pantry Pulse Worker", () => {
     const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first<{
       count: number;
     }>();
+
     expect(count?.count).toBe(1);
   });
 
@@ -159,12 +175,14 @@ describe("Pantry Pulse Worker", () => {
       delta: 2,
       reason: "second",
     });
+
     expect(conflict.status).toBe(409);
     expect(await conflict.json()).toMatchObject({ error: { code: "event_id_conflict" } });
   });
 
   it("serializes concurrent retries without double-applying inventory", async () => {
     const payload = { eventId: "evt-concurrent-01", delta: 1, reason: "concurrent retry" };
+
     const responses = await Promise.all([
       postJson("/api/items/itm-coffee/adjust", adminToken, payload),
       postJson("/api/items/itm-coffee/adjust", adminToken, payload),
@@ -173,7 +191,9 @@ describe("Pantry Pulse Worker", () => {
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
     const bodies = await Promise.all(responses.map((response) => response.json()));
     expect(
-      bodies.filter((entry) => (entry as { idempotentReplay: boolean }).idempotentReplay),
+      bodies.filter(
+        (entry) => z.object({ idempotentReplay: z.boolean() }).parse(entry).idempotentReplay,
+      ),
     ).toHaveLength(1);
     expect(
       await env.DB.prepare("SELECT quantity FROM items WHERE id = 'itm-coffee'").first(),
@@ -202,6 +222,7 @@ describe("Pantry Pulse Worker", () => {
 
   it("rejects one of two conflicting concurrent uses of an event ID", async () => {
     const eventId = "evt-concurrent-conflict";
+
     const responses = await Promise.all([
       postJson("/api/items/itm-coffee/adjust", adminToken, {
         eventId,
@@ -216,11 +237,13 @@ describe("Pantry Pulse Worker", () => {
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+
     const stored = await env.DB.prepare(
       "SELECT COUNT(*) AS count FROM inventory_events WHERE id = ?",
     )
       .bind(eventId)
       .first<{ count: number }>();
+
     expect(stored?.count).toBe(1);
   });
 
@@ -230,6 +253,7 @@ describe("Pantry Pulse Worker", () => {
       tagUid: "a1:b2:c3:d4",
       mode: "consume",
     });
+
     expect(denied.status).toBe(401);
 
     const scan = await postJson("/api/device/scans", deviceToken, {
@@ -237,12 +261,14 @@ describe("Pantry Pulse Worker", () => {
       tagUid: "a1:b2:c3:d4",
       mode: "consume",
     });
+
     expect(scan.status).toBe(201);
     expect(await scan.json()).toMatchObject({ item: { id: "itm-coffee", quantity: 0 } });
 
     const snapshot = await SELF.fetch("https://example.test/api/snapshot", {
       headers: authorization(adminToken),
     });
+
     expect(await snapshot.json()).toMatchObject({
       recentActivity: [{ itemId: "itm-coffee", rfidUid: "A1B2C3D4" }],
     });
@@ -251,6 +277,7 @@ describe("Pantry Pulse Worker", () => {
   it("reserves the successful-write quota for new linked scan events", async () => {
     let attemptCalls = 0;
     let writeCalls = 0;
+
     const fakeEnv = {
       ADMIN_TOKEN: adminToken,
       ASSETS: env.ASSETS,
@@ -258,6 +285,7 @@ describe("Pantry Pulse Worker", () => {
       DEVICE_ATTEMPT_RATE_LIMIT: {
         limit: async () => {
           attemptCalls += 1;
+
           return { success: true };
         },
       },
@@ -265,14 +293,16 @@ describe("Pantry Pulse Worker", () => {
       DEVICE_RATE_LIMIT: {
         limit: async () => {
           writeCalls += 1;
+
           return { success: true };
         },
       },
       DEVICE_TOKEN: deviceToken,
       MCP_READ_TOKEN: mcpReadToken,
       MCP_WRITE_TOKEN: mcpWriteToken,
-    } as unknown as PantryEnv;
-    const deviceRequest = (payload: unknown) =>
+    } satisfies PantryEnv;
+
+    const deviceRequest = <T>(payload: T) =>
       new Request("https://example.test/api/device/scans", {
         method: "POST",
         headers: {
@@ -302,6 +332,7 @@ describe("Pantry Pulse Worker", () => {
       tagUid: "A1B2C3D4",
       mode: "restock",
     };
+
     expect((await handleApi(deviceRequest(scan), fakeEnv)).status).toBe(201);
     expect((await handleApi(deviceRequest(scan), fakeEnv)).status).toBe(200);
     expect(attemptCalls).toBe(4);
@@ -312,6 +343,7 @@ describe("Pantry Pulse Worker", () => {
     const incomplete = await postJson("/api/items/itm-coffee/link", adminToken, {
       catalogProvider: "example-grocery",
     });
+
     expect(incomplete.status).toBe(422);
     expect(await incomplete.json()).toMatchObject({ error: { code: "incomplete_catalog_link" } });
 
@@ -323,6 +355,7 @@ describe("Pantry Pulse Worker", () => {
       catalogProvider: "example-grocery",
       providerItemId: "opaque-123",
     });
+
     expect(linked.status).toBe(200);
     expect(await linked.json()).toMatchObject({
       item: {
@@ -342,6 +375,7 @@ describe("Pantry Pulse Worker", () => {
     const paused = pausedBatch(env.DB);
     const pending = linkItem(paused.db, "itm-coffee", { name: "House coffee" });
     await paused.ready;
+
     try {
       await applyAdjustment(env.DB, {
         eventId: "evt-link-race-device",
@@ -355,6 +389,7 @@ describe("Pantry Pulse Worker", () => {
     } finally {
       paused.release();
     }
+
     expect(await pending).toMatchObject({
       name: "House coffee",
       quantity: 0,
@@ -369,11 +404,14 @@ describe("Pantry Pulse Worker", () => {
   it("rejects a stock correction overtaken by a device adjustment without partial edits", async () => {
     const paused = pausedBatch(env.DB);
     const pending = linkItem(paused.db, "itm-coffee", { name: "Stale name", quantity: 4 });
+
     const rejected = expect(pending).rejects.toMatchObject({
       status: 409,
       code: "inventory_conflict",
     });
+
     await paused.ready;
+
     try {
       await applyAdjustment(env.DB, {
         eventId: "evt-correction-race",
@@ -385,6 +423,7 @@ describe("Pantry Pulse Worker", () => {
     } finally {
       paused.release();
     }
+
     await rejected;
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
       name: "Coffee beans",
@@ -398,16 +437,20 @@ describe("Pantry Pulse Worker", () => {
   it("rejects one of two overlapping absolute corrections", async () => {
     const paused = pausedBatch(env.DB);
     const pending = linkItem(paused.db, "itm-coffee", { quantity: 4 });
+
     const rejected = expect(pending).rejects.toMatchObject({
       status: 409,
       code: "inventory_conflict",
     });
+
     await paused.ready;
+
     try {
       expect(await linkItem(env.DB, "itm-coffee", { quantity: 3 })).toMatchObject({ quantity: 3 });
     } finally {
       paused.release();
     }
+
     await rejected;
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 3 });
     expect(await env.DB.prepare("SELECT delta, reason FROM inventory_events").all()).toMatchObject({
@@ -421,12 +464,15 @@ describe("Pantry Pulse Worker", () => {
       tagUid: "A1B2C3D4",
       mode: "consume",
     });
+
     expect(scan.status).toBe(201);
+
     const correction = await postJson("/api/items/itm-coffee/link", adminToken, {
       name: "Stale edit",
       onHand: 4,
       expectedQuantity: 1,
     });
+
     expect(correction.status).toBe(409);
     expect(await correction.json()).toMatchObject({ error: { code: "inventory_conflict" } });
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
@@ -443,6 +489,7 @@ describe("Pantry Pulse Worker", () => {
       postJson("/api/items/itm-coffee/link", adminToken, { onHand: 3, expectedQuantity: 1 }),
       postJson("/api/items/itm-coffee/link", adminToken, { onHand: 4, expectedQuantity: 1 }),
     ]);
+
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
     const item = await getItem(env.DB, "itm-coffee");
     expect([3, 4]).toContain(item?.quantity);
@@ -456,14 +503,17 @@ describe("Pantry Pulse Worker", () => {
       onHand: 1,
       expectedQuantity: 1,
     });
+
     expect(unchanged.status).toBe(200);
     expect(
       await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first(),
     ).toMatchObject({ count: 0 });
+
     const correction = await postJson("/api/items/itm-coffee/link", adminToken, {
       onHand: 0,
       expectedQuantity: 1,
     });
+
     expect(correction.status).toBe(200);
     expect(await correction.json()).toMatchObject({ item: { quantity: 0 } });
     expect(await env.DB.prepare("SELECT delta FROM inventory_events").all()).toMatchObject({
@@ -477,6 +527,7 @@ describe("Pantry Pulse Worker", () => {
       onHand: 4,
       expectedQuantity: 2,
     });
+
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: { code: "tag_in_use" } });
     expect(await getItem(env.DB, "itm-oats")).toMatchObject({ quantity: 2, rfidUid: null });
@@ -490,11 +541,13 @@ describe("Pantry Pulse Worker", () => {
     const paused = pausedBatch(env.DB);
     const pending = linkItem(paused.db, "itm-coffee", { rfidUid: "DEADBEEF" });
     await paused.ready;
+
     try {
       await linkItem(env.DB, "itm-coffee", { catalogProvider: null, providerItemId: null });
     } finally {
       paused.release();
     }
+
     expect(await pending).toMatchObject({
       rfidUid: "DEADBEEF",
       catalogProvider: null,
@@ -506,20 +559,25 @@ describe("Pantry Pulse Worker", () => {
   it("validates partial catalog edits against the pair at commit time", async () => {
     await linkItem(env.DB, "itm-coffee", { catalogProvider: "grocer", providerItemId: "sku-1" });
     const paused = pausedBatch(env.DB);
+
     const pending = linkItem(paused.db, "itm-coffee", {
       catalogProvider: "new-grocer",
       quantity: 3,
     });
+
     const rejected = expect(pending).rejects.toMatchObject({
       status: 422,
       code: "incomplete_catalog_link",
     });
+
     await paused.ready;
+
     try {
       await linkItem(env.DB, "itm-coffee", { catalogProvider: null, providerItemId: null });
     } finally {
       paused.release();
     }
+
     await rejected;
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
       catalogProvider: null,
@@ -540,6 +598,7 @@ describe("Pantry Pulse Worker", () => {
       },
       10,
     );
+
     expect(linked.status).toBe(200);
     expect(await mcpJson(linked)).toMatchObject({
       result: {
@@ -552,6 +611,7 @@ describe("Pantry Pulse Worker", () => {
         },
       },
     });
+
     const incomplete = await mcpRequest(
       "tools/call",
       {
@@ -560,7 +620,9 @@ describe("Pantry Pulse Worker", () => {
       },
       11,
     );
+
     expect(await mcpJson(incomplete)).toMatchObject({ result: { isError: true } });
+
     const cleared = await mcpRequest(
       "tools/call",
       {
@@ -569,6 +631,7 @@ describe("Pantry Pulse Worker", () => {
       },
       12,
     );
+
     expect(await mcpJson(cleared)).toMatchObject({
       result: {
         structuredContent: {
@@ -591,6 +654,7 @@ describe("Pantry Pulse Worker", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
     });
+
     expect(denied.status).toBe(401);
 
     const dashboardTokenDenied = await mcpRequest("tools/list", {}, 99, adminToken);
@@ -605,13 +669,25 @@ describe("Pantry Pulse Worker", () => {
       },
       1,
     );
+
     expect(initialized.status).toBe(200);
 
     const listed = await mcpRequest("tools/list", {}, 2);
     expect(listed.status).toBe(200);
-    const listPayload = (await mcpJson(listed)) as {
-      result: { tools: Array<{ name: string; annotations?: Record<string, boolean> }> };
-    };
+
+    const listPayload = z
+      .object({
+        result: z.object({
+          tools: z.array(
+            z.object({
+              name: z.string(),
+              annotations: z.record(z.string(), z.boolean()).optional(),
+            }),
+          ),
+        }),
+      })
+      .parse(await mcpJson(listed));
+
     expect(listPayload.result.tools.map((tool) => tool.name)).toEqual([
       "pantry_snapshot",
       "shopping_queue_export",
@@ -625,15 +701,33 @@ describe("Pantry Pulse Worker", () => {
 
     const snapshot = await mcpRequest("tools/call", { name: "pantry_snapshot", arguments: {} }, 3);
     expect(snapshot.status).toBe(200);
-    const snapshotPayload = (await mcpJson(snapshot)) as {
-      result: { structuredContent: { summary: { itemCount: number } } };
-    };
+
+    const snapshotPayload = z
+      .object({
+        result: z.object({
+          structuredContent: z.object({
+            summary: z.object({ itemCount: z.number() }),
+          }),
+        }),
+      })
+      .parse(await mcpJson(snapshot));
+
     expect(snapshotPayload.result.structuredContent.summary.itemCount).toBe(2);
 
     const readOnlyList = await mcpRequest("tools/list", {}, 4, mcpReadToken);
-    const readOnlyPayload = (await mcpJson(readOnlyList)) as {
-      result: { tools: Array<{ name: string }> };
-    };
+
+    const readOnlyPayload = z
+      .object({
+        result: z.object({
+          tools: z.array(
+            z.object({
+              name: z.string(),
+            }),
+          ),
+        }),
+      })
+      .parse(await mcpJson(readOnlyList));
+
     expect(readOnlyPayload.result.tools.map((tool) => tool.name)).toEqual([
       "pantry_snapshot",
       "shopping_queue_export",
@@ -651,6 +745,7 @@ describe("Pantry Pulse Worker", () => {
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 5, method: "tools/list", params: {} }),
     });
+
     expect(foreignOrigin.status).toBe(403);
   });
 
@@ -660,6 +755,7 @@ describe("Pantry Pulse Worker", () => {
       delta: 1,
       reason: "bad path",
     });
+
     expect(malformed.status).toBe(400);
     expect(await malformed.json()).toMatchObject({ error: { code: "invalid_path" } });
 
@@ -671,6 +767,7 @@ describe("Pantry Pulse Worker", () => {
       },
       body: JSON.stringify({ name: "x".repeat(17 * 1024) }),
     });
+
     expect(oversized.status).toBe(413);
     expect(await oversized.json()).toMatchObject({ error: { code: "body_too_large" } });
   });
