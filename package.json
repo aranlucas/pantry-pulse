@@ -25,9 +25,9 @@
     "build:worker": "wrangler build --experimental-new-config --experimental-cf-build-output"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "2.1.0",
+    "@modelcontextprotocol/server": "2.2.0",
     "agents": "0.24.0",
-    "lucide-react": "1.48.0",
+    "lucide-react": "1.49.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"
