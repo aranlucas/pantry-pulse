@@ -33,7 +33,7 @@ A non-null `onHand` is an absolute stock correction. Send `expectedQuantity` wit
 Requirements:
 
 - Node.js 24 or newer.
-- pnpm 11.24.0 (`packageManager` in `package.json`). Wrangler is installed by the project.
+- pnpm 12.6.0 (`packageManager` in `package.json`). Wrangler is installed by the project.
 - PlatformIO and an ESP32 DevKit with an MFRC522 reader only when working on firmware.
 
 Install dependencies and create untracked local Worker credentials:
