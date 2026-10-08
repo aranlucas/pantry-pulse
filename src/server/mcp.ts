@@ -3,7 +3,7 @@ import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import { applyAdjustment, getSnapshot, linkItem } from "./repository";
 import { mcpAdjustSchema, mcpLinkSchema, shoppingExportSchema } from "./schemas";
-import type { McpAccess, PantryEnv } from "./types";
+import type { McpAccess } from "./types";
 import { PantryError } from "./types";
 
 const itemSchema = z.object({
@@ -43,7 +43,7 @@ function toolError(cause: unknown) {
   };
 }
 
-export function createPantryMcpServer(env: PantryEnv, access: McpAccess): McpServer {
+export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): McpServer {
   const server = new McpServer({ name: "pantry-pulse", version: "0.1.0" });
 
   server.registerTool(
@@ -193,7 +193,7 @@ export function createPantryMcpServer(env: PantryEnv, access: McpAccess): McpSer
   return server;
 }
 
-export function createPantryMcpHandler(env: PantryEnv, access: McpAccess) {
+export function createPantryMcpHandler(env: Cloudflare.Env, access: McpAccess) {
   return createMcpHandler(() => createPantryMcpServer(env, access), {
     route: "/mcp",
     corsOptions: false,

@@ -6,7 +6,6 @@ import {
   countEventTombstones,
   pruneInventoryEvents,
 } from "./server/repository";
-import type { PantryEnv } from "./server/types";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -117,4 +116,4 @@ export default {
       }),
     );
   },
-} satisfies ExportedHandler<PantryEnv>;
+} satisfies ExportedHandler<Cloudflare.Env>;

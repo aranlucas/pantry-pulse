@@ -1,5 +1,3 @@
-export type PantryEnv = Cloudflare.Env;
-
 export type McpAccess = "read" | "write";
 
 export interface PantryItem {

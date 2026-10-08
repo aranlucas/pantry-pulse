@@ -4,7 +4,6 @@ import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleApi } from "../src/server/http";
 import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "../src/server/repository";
-import type { PantryEnv } from "../src/server/types";
 
 const adminToken = "test-admin-token-with-enough-entropy";
 
@@ -301,7 +300,7 @@ describe("Pantry Pulse Worker", () => {
       DEVICE_TOKEN: deviceToken,
       MCP_READ_TOKEN: mcpReadToken,
       MCP_WRITE_TOKEN: mcpWriteToken,
-    } satisfies PantryEnv;
+    } satisfies Cloudflare.Env;
 
     const deviceRequest = <T>(payload: T) =>
       new Request("https://example.test/api/device/scans", {
