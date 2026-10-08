@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { McpAccess, PantryEnv } from "./types";
 
 const encoder = new TextEncoder();
@@ -8,7 +9,7 @@ async function secureEqual(candidate: string, expected: string): Promise<boolean
     crypto.subtle.digest("SHA-256", encoder.encode(expected)),
   ]);
 
-  return crypto.subtle.timingSafeEqual(candidateDigest, expectedDigest);
+  return timingSafeEqual(new Uint8Array(candidateDigest), new Uint8Array(expectedDigest));
 }
 
 function bearerToken(request: Request): string | null {

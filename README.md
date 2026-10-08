@@ -91,7 +91,7 @@ pnpm build
 pnpm deploy
 ```
 
-`pnpm check` runs formatting, linting, type checking, the full application build, and a deployment dry run. `pnpm test` runs the client and Worker Vitest suites; Worker tests load `cloudflare.config.ts`. `pnpm typecheck` regenerates binding and runtime types with `cf workers types` before checking TypeScript. Generated declarations live in the ignored `.cloudflare/types/` directory, so CI generates them rather than committing them. `pnpm cf-typegen:check` regenerates types and checks the Worker on its own.
+`pnpm check` runs formatting, linting, type checking, the full application build, and a deployment dry run. `pnpm test` runs the client and Worker Vitest suites; Worker tests load `cloudflare.config.ts`. `pnpm typecheck` regenerates binding and runtime types with `cf workers types` before checking the dashboard, Worker, tests, and tooling through the shared `tsconfig.json`. Generated declarations live in the ignored `.cloudflare/types/` directory, so CI generates them rather than committing them. `PantryEnv` uses the generated `Cloudflare.Env` type directly. `pnpm cf-typegen:check` is an alias for the full type check.
 
 `pnpm build` runs `cf build` to package the Worker and dashboard together in `.cloudflare/output/`. `pnpm deploy` builds the application and deploys that output with `cf deploy --prebuilt --mode production`. Vite records the build mode, so prebuilt deployments must specify the same mode. To validate the built output without uploading anything, run `pnpm cf deploy --prebuilt --mode production --dry-run` after `pnpm build`.
 

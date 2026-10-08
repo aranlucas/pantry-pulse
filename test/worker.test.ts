@@ -279,6 +279,7 @@ describe("Pantry Pulse Worker", () => {
     let writeCalls = 0;
 
     const fakeEnv = {
+      ...env,
       ADMIN_TOKEN: adminToken,
       ASSETS: env.ASSETS,
       DB: env.DB,
