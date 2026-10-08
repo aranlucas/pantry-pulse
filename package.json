@@ -6,7 +6,7 @@
   "scripts": {
     "build": "cf build",
     "cf-typegen": "cf workers types",
-    "cf-typegen:check": "pnpm cf-typegen && tsc -p tsconfig.worker.json",
+    "cf-typegen:check": "pnpm typecheck",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && cf deploy --prebuilt --mode production --dry-run",
     "db:migrate:local": "cf d1 migrations apply 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --dir migrations --local --persist-to .cloudflare/state",
     "db:migrate:remote": "cf d1 migrations apply 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --dir migrations",
@@ -19,7 +19,7 @@
     "lint": "oxlint --deny-warnings .",
     "test": "vitest run --config vitest.client.config.ts && vitest run",
     "test:watch": "vitest",
-    "typecheck": "pnpm cf-typegen && tsc -b",
+    "typecheck": "pnpm cf-typegen && tsc --project tsconfig.json",
     "cf": "cf"
   },
   "dependencies": {

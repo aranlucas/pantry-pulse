@@ -1,10 +1,3 @@
-import type { InferEnv, UnwrapConfig } from "cf/config";
-import type config from "../../cloudflare.config";
-
-type WorkerConfig = UnwrapConfig<UnwrapConfig<typeof config>["worker"]>;
-
-export type PantryEnv = InferEnv<WorkerConfig>;
-
 export type McpAccess = "read" | "write";
 
 export interface PantryItem {

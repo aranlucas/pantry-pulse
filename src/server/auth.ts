@@ -1,4 +1,5 @@
-import type { McpAccess, PantryEnv } from "./types";
+import { timingSafeEqual } from "node:crypto";
+import type { McpAccess } from "./types";
 
 const encoder = new TextEncoder();
 
@@ -8,7 +9,7 @@ async function secureEqual(candidate: string, expected: string): Promise<boolean
     crypto.subtle.digest("SHA-256", encoder.encode(expected)),
   ]);
 
-  return crypto.subtle.timingSafeEqual(candidateDigest, expectedDigest);
+  return timingSafeEqual(new Uint8Array(candidateDigest), new Uint8Array(expectedDigest));
 }
 
 function bearerToken(request: Request): string | null {
@@ -21,19 +22,22 @@ function bearerToken(request: Request): string | null {
   return match?.[1]?.trim() || null;
 }
 
-export async function hasAdminAccess(request: Request, env: PantryEnv): Promise<boolean> {
+export async function hasAdminAccess(request: Request, env: Cloudflare.Env): Promise<boolean> {
   const candidate = bearerToken(request);
 
   return Boolean(candidate && env.ADMIN_TOKEN && (await secureEqual(candidate, env.ADMIN_TOKEN)));
 }
 
-export async function hasDeviceAccess(request: Request, env: PantryEnv): Promise<boolean> {
+export async function hasDeviceAccess(request: Request, env: Cloudflare.Env): Promise<boolean> {
   const candidate = bearerToken(request);
 
   return Boolean(candidate && env.DEVICE_TOKEN && (await secureEqual(candidate, env.DEVICE_TOKEN)));
 }
 
-export async function getMcpAccess(request: Request, env: PantryEnv): Promise<McpAccess | null> {
+export async function getMcpAccess(
+  request: Request,
+  env: Cloudflare.Env,
+): Promise<McpAccess | null> {
   const candidate = bearerToken(request);
 
   if (!candidate) return null;

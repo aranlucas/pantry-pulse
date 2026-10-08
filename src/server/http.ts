@@ -16,7 +16,6 @@ import {
   deviceScanSchema,
   itemIdSchema,
 } from "./schemas";
-import type { PantryEnv } from "./types";
 import { PantryError } from "./types";
 
 const maxBodyBytes = 16 * 1024;
@@ -143,7 +142,7 @@ function decodedItemId(encoded: string): string {
   }
 }
 
-async function route(request: Request, env: PantryEnv): Promise<Response> {
+async function route(request: Request, env: Cloudflare.Env): Promise<Response> {
   const url = new URL(request.url);
   const pathname = url.pathname.replace(/\/$/, "") || "/";
 
@@ -228,7 +227,7 @@ async function route(request: Request, env: PantryEnv): Promise<Response> {
   return json({ error: { code: "not_found", message: "API route not found" } }, 404);
 }
 
-export async function handleApi(request: Request, env: PantryEnv): Promise<Response> {
+export async function handleApi(request: Request, env: Cloudflare.Env): Promise<Response> {
   try {
     return await route(request, env);
   } catch (error) {
