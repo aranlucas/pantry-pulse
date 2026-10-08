@@ -31,7 +31,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "2.0.0-beta.sha-52b0dc0e9",
+    "@cloudflare/vite-plugin": "2.0.0-beta.sha-805ec1ff3",
     "@cloudflare/vitest-plugin": "1.4.0",
     "@oxlint/plugins": "1.87.0",
     "@types/node": "26.6.4",
