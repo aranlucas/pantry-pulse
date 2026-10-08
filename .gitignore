@@ -1,6 +1,5 @@
 node_modules/
 dist/
-.wrangler/
 .pio/
 .env
 .env.*
@@ -16,7 +15,6 @@ coverage/
 *.p12
 *.pfx
 *.crt
-worker-configuration.d.ts.tmp
 firmware/esp32-rfid/config.h
 
 # Cloudflare CLI build output and generated types

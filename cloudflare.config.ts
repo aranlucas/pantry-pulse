@@ -29,6 +29,10 @@ export default defineConfig({
       }),
     ],
     env: {
+      ADMIN_TOKEN: bindings.secret(),
+      DEVICE_TOKEN: bindings.secret(),
+      MCP_READ_TOKEN: bindings.secret(),
+      MCP_WRITE_TOKEN: bindings.secret(),
       DEVICE_ID: bindings.text("pantry-station-1"),
       DB: bindings.d1({
         name: "pantry-pulse",

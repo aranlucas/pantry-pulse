@@ -1,9 +1,9 @@
-export interface PantryEnv extends Env {
-  ADMIN_TOKEN: string;
-  DEVICE_TOKEN: string;
-  MCP_READ_TOKEN: string;
-  MCP_WRITE_TOKEN: string;
-}
+import type { InferEnv, UnwrapConfig } from "cf/config";
+import type config from "../../cloudflare.config";
+
+type WorkerConfig = UnwrapConfig<UnwrapConfig<typeof config>["worker"]>;
+
+export type PantryEnv = InferEnv<WorkerConfig>;
 
 export type McpAccess = "read" | "write";
 

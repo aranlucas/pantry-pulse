@@ -33,7 +33,7 @@ A non-null `onHand` is an absolute stock correction. Send `expectedQuantity` wit
 Requirements:
 
 - Node.js 24 or newer.
-- pnpm 11.24.0 (`packageManager` in `package.json`). Wrangler is installed by the project.
+- pnpm 12.10.1 (`packageManager` in `package.json`). Cloudflare CLI (`cf`) and the Cloudflare Vite plugin are installed by the project.
 - PlatformIO and an ESP32 DevKit with an MFRC522 reader only when working on firmware.
 
 Install dependencies and create untracked local Worker credentials:
@@ -52,7 +52,9 @@ pnpm db:seed:local
 pnpm dev
 ```
 
-`pnpm dev` runs Vite and `wrangler dev --experimental-new-config` together. Open the Vite URL printed by the command (normally `http://localhost:5173`); its `/api`, `/health`, and `/mcp` requests proxy to the Worker on port `8787`. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+`pnpm dev` runs `cf dev`, which starts Vite with the Cloudflare plugin. Open the URL printed by the command (normally `http://127.0.0.1:5173`); the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+
+The Cloudflare plugin and local D1 scripts share `.cloudflare/state/`, configured with `persistState` in `vite.config.ts`. The scripts pass `--persist-to .cloudflare/state` because `cf` resource commands otherwise use a machine-wide state directory.
 
 For a deployed D1 database, review the migration and run the remote commands explicitly:
 
@@ -61,7 +63,7 @@ pnpm db:migrate:remote
 pnpm db:seed:remote
 ```
 
-The remote commands require an authenticated Wrangler session and operate on the `pantry-pulse` D1 binding declared in `wrangler.jsonc`.
+The remote commands require `pnpm cf auth login` or a `CLOUDFLARE_API_TOKEN` and operate on the database UUID declared in `cloudflare.config.ts`. `cf` D1 commands default to remote resources; the local scripts explicitly pass `--local`. If you provision a different database, update its ID in both the config and the database scripts in `package.json`.
 
 ## Firmware
 
@@ -89,7 +91,11 @@ pnpm build
 pnpm deploy
 ```
 
-`pnpm check` runs formatting, linting, type checking, Cloudflare binding checks, and the web build. `pnpm test` runs the client and Worker Vitest suites. Build the web assets before `pnpm deploy`; Wrangler serves `dist/` through the static asset binding.
+`pnpm check` runs formatting, linting, type checking, the full application build, and a deployment dry run. `pnpm test` runs the client and Worker Vitest suites; Worker tests load `cloudflare.config.ts`. `pnpm typecheck` regenerates binding and runtime types with `cf workers types` before checking TypeScript. Generated declarations live in the ignored `.cloudflare/types/` directory, so CI generates them rather than committing them. `pnpm cf-typegen:check` regenerates types and checks the Worker on its own.
+
+`pnpm build` runs `cf build` to package the Worker and dashboard together in `.cloudflare/output/`. `pnpm deploy` builds the application and deploys that output with `cf deploy --prebuilt --mode production`. Vite records the build mode, so prebuilt deployments must specify the same mode. To validate the built output without uploading anything, run `pnpm cf deploy --prebuilt --mode production --dry-run` after `pnpm build`.
+
+The project uses the [Cloudflare CLI](https://developers.cloudflare.com/cf/) and Cloudflare Vite plugin 2.0 beta. `cloudflare.config.ts` owns Worker settings and bindings; `vite.config.ts` configures development and bundling. `cf` is currently in beta.
 
 ## Source map
 

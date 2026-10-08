@@ -10,9 +10,9 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"],
+    "types": ["@cloudflare/vitest-plugin/types"],
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/worker.ts", "src/server/**/*.ts", "test/**/*.ts"],
+  "include": ["src/worker.ts", "src/server/**/*.ts", "test/**/*.ts", ".cloudflare/types"],
   "exclude": ["test/client-motion.test.ts", "test/client-http.test.ts"]
 }
