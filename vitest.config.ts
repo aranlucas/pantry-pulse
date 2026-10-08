@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
     cloudflareTest(async () => ({
-      wrangler: { configPath: "./wrangler.jsonc" },
+      experimental: { newConfig: true },
       miniflare: {
         bindings: {
           ADMIN_TOKEN: "test-admin-token-with-enough-entropy",
