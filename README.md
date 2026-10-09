@@ -52,7 +52,7 @@ pnpm db:seed:local
 pnpm dev
 ```
 
-`pnpm dev` runs `cf dev`, which starts Vite with the Cloudflare plugin. Open the URL printed by the command (normally `http://127.0.0.1:5173`); the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+`pnpm dev` starts Vite with the Cloudflare plugin through [Portless](https://github.com/vercel-labs/portless) (a dev dependency); its first run may ask for `sudo` to bind port 443 and trust a local certificate. Open `https://pantry-pulse.localhost`; the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
 
 The Cloudflare plugin and local D1 scripts share `.cloudflare/state/`, configured with `persistState` in `vite.config.ts`. The scripts pass `--persist-to .cloudflare/state` because `cf` resource commands otherwise use a machine-wide state directory.
 
