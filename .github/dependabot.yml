@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: thursday
+      time: "06:00"
+      timezone: America/Los_Angeles
     groups:
       production-dependencies:
         dependency-type: production
@@ -14,3 +17,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: thursday
+      time: "06:00"
+      timezone: America/Los_Angeles
