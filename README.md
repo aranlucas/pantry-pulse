@@ -49,10 +49,11 @@ Replace every token in `.dev.vars` with a high-entropy value. Apply the local D1
 ```bash
 pnpm db:migrate:local
 pnpm db:seed:local
+npm install -g portless@0.15.7
 pnpm dev
 ```
 
-`pnpm dev` runs `cf dev`, which starts Vite with the Cloudflare plugin. Open the URL printed by the command (normally `http://127.0.0.1:5173`); the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+`pnpm dev` runs Vite behind Portless with the existing Cloudflare plugin. Open the printed URL (normally `https://pantry-pulse.localhost`); the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
 
 The Cloudflare plugin and local D1 scripts share `.cloudflare/state/`, configured with `persistState` in `vite.config.ts`. The scripts pass `--persist-to .cloudflare/state` because `cf` resource commands otherwise use a machine-wide state directory.
 
@@ -65,15 +66,16 @@ pnpm db:seed:remote
 
 The remote commands require `pnpm cf auth login` or a `CLOUDFLARE_API_TOKEN` and operate on the database UUID declared in `cloudflare.config.ts`. `cf` D1 commands default to remote resources; the local scripts explicitly pass `--local`. If you provision a different database, update its ID in both the config and the database scripts in `package.json`.
 
-### Named local URL with Portless
+### Development URL with Portless
 
-[Portless](https://github.com/vercel-labs/portless/tree/v0.15.7) gives this checkout a
-stable local URL. Complete the local setup above, use **Node.js 24 or newer**
-(within this project's supported range), then run:
+The normal `pnpm run dev` command uses
+[Portless](https://github.com/vercel-labs/portless/tree/v0.15.7) for a stable local URL.
+Install its CLI once with **Node.js 24 or newer** (within this project's supported
+range), then run:
 
 ```sh
 npm install -g portless@0.15.7
-pnpm run dev:portless
+pnpm run dev
 ```
 
 Open **https://pantry-pulse.localhost** with the default proxy settings.
@@ -88,7 +90,7 @@ does not forward arbitrary Vite CLI flags.
 
 Linked Git worktrees receive a branch-name prefix, such as
 `https://fix-ui.pantry-pulse.localhost`; use the URL Portless prints.
-Use `pnpm run dev` for the existing direct-server workflow.
+Use `pnpm run dev:direct` to run the original localhost server without Portless.
 
 Browser storage and offline caches belong to each origin. Existing data at a
 numbered localhost URL stays there; use the app's export/import flow when available
