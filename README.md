@@ -49,11 +49,10 @@ Replace every token in `.dev.vars` with a high-entropy value. Apply the local D1
 ```bash
 pnpm db:migrate:local
 pnpm db:seed:local
-npm install -g portless@0.15.7
 pnpm dev
 ```
 
-`pnpm dev` runs Vite behind Portless with the existing Cloudflare plugin. Open the printed URL (normally `https://pantry-pulse.localhost`); the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
+`pnpm dev` starts Vite with the Cloudflare plugin through [Portless](https://github.com/vercel-labs/portless) (a dev dependency); its first run may ask for `sudo` to bind port 443 and trust a local certificate. Open `https://pantry-pulse.localhost`; the same server serves the dashboard and runs `/api`, `/health`, and `/mcp` in the Workers runtime. The dashboard asks for `ADMIN_TOKEN` from `.dev.vars`.
 
 The Cloudflare plugin and local D1 scripts share `.cloudflare/state/`, configured with `persistState` in `vite.config.ts`. The scripts pass `--persist-to .cloudflare/state` because `cf` resource commands otherwise use a machine-wide state directory.
 
@@ -65,35 +64,6 @@ pnpm db:seed:remote
 ```
 
 The remote commands require `pnpm cf auth login` or a `CLOUDFLARE_API_TOKEN` and operate on the database UUID declared in `cloudflare.config.ts`. `cf` D1 commands default to remote resources; the local scripts explicitly pass `--local`. If you provision a different database, update its ID in both the config and the database scripts in `package.json`.
-
-### Development URL with Portless
-
-The normal `pnpm run dev` command uses
-[Portless](https://github.com/vercel-labs/portless/tree/v0.15.7) for a stable local URL.
-Install its CLI once with **Node.js 24 or newer** (within this project's supported
-range), then run:
-
-```sh
-npm install -g portless@0.15.7
-pnpm run dev
-```
-
-Open **https://pantry-pulse.localhost** with the default proxy settings.
-Portless starts its shared proxy automatically. Its first HTTPS run creates and
-trusts a local certificate authority and may prompt for administrator privileges
-to bind port 443 or update local hostname entries. Start it from an interactive
-terminal and review those prompts. `portless doctor` diagnoses local setup issues.
-
-Portless supplies Vite with a free port, a loopback host, and `--strictPort`.
-It starts Vite with the existing Cloudflare plugin directly, since `cf dev`
-does not forward arbitrary Vite CLI flags.
-
-Linked Git worktrees receive a branch-name prefix, such as
-`https://fix-ui.pantry-pulse.localhost`; use the URL Portless prints.
-
-Browser storage and offline caches belong to each origin. Existing data at a
-numbered localhost URL stays there; use the app's export/import flow when available
-to move data to the named URL.
 
 ## Firmware
 
