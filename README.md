@@ -65,6 +65,35 @@ pnpm db:seed:remote
 
 The remote commands require `pnpm cf auth login` or a `CLOUDFLARE_API_TOKEN` and operate on the database UUID declared in `cloudflare.config.ts`. `cf` D1 commands default to remote resources; the local scripts explicitly pass `--local`. If you provision a different database, update its ID in both the config and the database scripts in `package.json`.
 
+### Named local URL with Portless
+
+[Portless](https://github.com/vercel-labs/portless/tree/v0.15.7) gives this checkout a
+stable local URL. Complete the local setup above, use **Node.js 24 or newer**
+(within this project's supported range), then run:
+
+```sh
+npm install -g portless@0.15.7
+pnpm run dev:portless
+```
+
+Open **https://pantry-pulse.localhost** with the default proxy settings.
+Portless starts its shared proxy automatically. Its first HTTPS run creates and
+trusts a local certificate authority and may prompt for administrator privileges
+to bind port 443 or update local hostname entries. Start it from an interactive
+terminal and review those prompts. `portless doctor` diagnoses local setup issues.
+
+Portless supplies Vite with a free port, a loopback host, and `--strictPort`.
+It starts Vite with the existing Cloudflare plugin directly, since `cf dev`
+does not forward arbitrary Vite CLI flags.
+
+Linked Git worktrees receive a branch-name prefix, such as
+`https://fix-ui.pantry-pulse.localhost`; use the URL Portless prints.
+Use `pnpm run dev` for the existing direct-server workflow.
+
+Browser storage and offline caches belong to each origin. Existing data at a
+numbered localhost URL stays there; use the app's export/import flow when available
+to move data to the named URL.
+
 ## Firmware
 
 The reference station is documented in [`firmware/esp32-rfid/README.md`](firmware/esp32-rfid/README.md). It uses an ESP32 DevKit, an MFRC522 over SPI, and a normally-open mode button. Copy `config.example.h` to `config.h`, fill in Wi-Fi, the Worker base URL and matching host, the device token, and the TLS root CA, then run:

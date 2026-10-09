@@ -14,6 +14,7 @@
     "db:seed:remote": "cf d1 raw 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --sql \"$(cat scripts/seed.sql)\"",
     "deploy": "pnpm build && cf deploy --prebuilt --mode production",
     "dev": "cf dev",
+    "dev:portless": "portless run --name pantry-pulse vite",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --deny-warnings .",
