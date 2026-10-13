@@ -52,10 +52,7 @@
   },
   "overrides": [
     {
-      "files": [
-        "src/worker.ts",
-        "src/server/**"
-      ],
+      "files": ["src/worker.ts", "src/server/**"],
       "rules": {
         "eslint/no-console": "off"
       }
