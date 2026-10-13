@@ -15,7 +15,7 @@ export default defineConfig({
           TEST_MIGRATIONS: await readD1Migrations("./migrations"),
         },
       },
-    }))
+    })),
   ],
   test: {
     setupFiles: ["./test/setup.ts"],
@@ -24,7 +24,7 @@ export default defineConfig({
       "**/dist/**",
       "test/client-dashboard.test.tsx",
       "test/client-motion.test.ts",
-      "test/client-http.test.ts"
+      "test/client-http.test.ts",
     ],
   },
 });
