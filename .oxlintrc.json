@@ -74,6 +74,12 @@
     "**/.opencode/**",
     "**/.pi/**",
     "**/.roo/**",
-    "**/.windsurf/**"
-  ]
+    "**/.windsurf/**",
+    "**/.next/**",
+    "**/.expo/**",
+    "**/.vercel/**"
+  ],
+  "options": {
+    "typeAware": true
+  }
 }
