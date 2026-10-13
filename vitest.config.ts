@@ -21,7 +21,6 @@ export default defineConfig({
     setupFiles: ["./test/setup.ts"],
     exclude: [
       "**/node_modules/**",
-      "tools/oxlint/anti-slop/**",
       "**/dist/**",
       "test/client-dashboard.test.tsx",
       "test/client-motion.test.ts",
