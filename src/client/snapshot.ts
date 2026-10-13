@@ -16,7 +16,7 @@ const number = z
   ])
   .catch(0);
 
-// oxlint-disable-next-line unicorn/no-useless-undefined -- Zod's catch() requires an explicit fallback value.
+// Zod's catch() requires an explicit fallback value.
 const identifier = z.string().optional().catch(undefined);
 
 const inventoryFields = z.object({
