@@ -16,6 +16,7 @@ const number = z
   ])
   .catch(0);
 
+// oxlint-disable-next-line unicorn/no-useless-undefined -- Zod's catch() requires an explicit fallback value.
 const identifier = z.string().optional().catch(undefined);
 
 const inventoryFields = z.object({
@@ -93,8 +94,6 @@ const snapshotFields = z.object({
 export const snapshotSchema: z.ZodType<PantrySnapshot> = snapshotFields.catch(() =>
   snapshotFields.parse({}),
 );
-
-export const decodeSnapshot = snapshotSchema.parse;
 
 export function activityWasConsumed(delta: number): boolean {
   return delta < 0;

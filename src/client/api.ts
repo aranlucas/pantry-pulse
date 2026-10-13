@@ -28,28 +28,33 @@ const parsedJson = z.string().transform((text) => {
   }
 });
 
-const ignoredResponse = z.unknown().transform(() => undefined);
+const ignoredResponse = z.unknown().transform(() => {});
+
+type JsonRequestInit = Pick<RequestInit, "body" | "method">;
 
 async function requestJson<T>(
   token: string,
   path: string,
   schema: z.ZodType<T>,
-  init: RequestInit = {},
+  init: JsonRequestInit = {},
 ): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 12_000);
 
   try {
-    const headers: Record<string, string> = {};
-    headers.Accept = "application/json";
-    headers.Authorization = `Bearer ${token}`;
+    const headers = new Headers({
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    });
 
-    if (init.body) headers["Content-Type"] = "application/json";
+    if (init.body) {
+      headers.set("Content-Type", "application/json");
+    }
 
     const response = await fetch(path, {
       ...init,
       signal: controller.signal,
-      headers: { ...headers, ...init.headers },
+      headers,
     });
 
     const payload = parsedJson.parse(await response.text());
@@ -73,7 +78,9 @@ async function requestJson<T>(
 
     return schema.parse(payload);
   } catch (error) {
-    if (error instanceof ApiError) throw error;
+    if (error instanceof ApiError) {
+      throw error;
+    }
 
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError("The pantry station took too long to respond.", 408);
@@ -89,14 +96,14 @@ async function requestJson<T>(
 }
 
 function createEventId(): string {
-  if (typeof crypto !== "undefined" && z.function().safeParse(crypto.randomUUID).success) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `web-${crypto.randomUUID()}`;
   }
 
   return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export async function fetchSnapshot(token: string): Promise<PantrySnapshot> {
+export function fetchSnapshot(token: string): Promise<PantrySnapshot> {
   return requestJson(token, "/api/snapshot", snapshotSchema);
 }
 

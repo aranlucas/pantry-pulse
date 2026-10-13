@@ -5,7 +5,9 @@ import { formatActivitySource, formatDate, formatRfidUid } from "./format";
 import { activityWasConsumed } from "./snapshot";
 import type { ActivityEvent } from "./types";
 
-export function ActivitySection({ events }: { events: ActivityEvent[] }): ReactNode {
+type ActivitySectionProps = { events: ActivityEvent[] };
+
+export function ActivitySection({ events }: ActivitySectionProps): ReactNode {
   return (
     <section className="activity-section" aria-label="Recent scans" id="activity-view">
       <div className="activity-heading">

@@ -23,28 +23,44 @@ function isLowStock(item: InventoryItem): boolean {
 }
 
 function progressFor(item: InventoryItem): number {
-  if (item.targetQuantity <= 0) return item.quantity > 0 ? 100 : 0;
+  if (item.targetQuantity <= 0) {
+    return item.quantity > 0 ? 100 : 0;
+  }
 
   return Math.min(100, Math.max(0, (item.quantity / item.targetQuantity) * 100));
 }
 
-function itemIconFor(name: string) {
+type ItemIconProps = { name: string };
+
+function ItemIcon({ name }: ItemIconProps): ReactNode {
   const normalized = name.toLowerCase();
 
-  if (normalized.includes("milk")) return Milk;
+  if (normalized.includes("milk")) {
+    return <Milk size={23} strokeWidth={1.7} />;
+  }
 
-  if (normalized.includes("bean")) return Bean;
+  if (normalized.includes("bean")) {
+    return <Bean size={23} strokeWidth={1.7} />;
+  }
 
-  if (normalized.includes("coffee")) return Coffee;
+  if (normalized.includes("coffee")) {
+    return <Coffee size={23} strokeWidth={1.7} />;
+  }
 
-  if (normalized.includes("rice") || normalized.includes("grain")) return Wheat;
+  if (normalized.includes("rice") || normalized.includes("grain")) {
+    return <Wheat size={23} strokeWidth={1.7} />;
+  }
 
-  if (normalized.includes("soup") || normalized.includes("broth")) return Soup;
+  if (normalized.includes("soup") || normalized.includes("broth")) {
+    return <Soup size={23} strokeWidth={1.7} />;
+  }
 
-  return Package;
+  return <Package size={23} strokeWidth={1.7} />;
 }
 
-export function InventoryHeader({ onLink }: { onLink: () => void }): ReactNode {
+type InventoryHeaderProps = { onLink: () => void };
+
+export function InventoryHeader({ onLink }: InventoryHeaderProps): ReactNode {
   return (
     <div className="inventory-header">
       <div>
@@ -62,21 +78,22 @@ export function InventoryHeader({ onLink }: { onLink: () => void }): ReactNode {
   );
 }
 
+type InventoryRowProps = {
+  item: InventoryItem;
+  expanded: boolean;
+  pending: boolean;
+  onAdjust: (delta: number) => void;
+  onToggle: () => void;
+};
+
 function InventoryRow({
   item,
   expanded,
   pending,
   onAdjust,
   onToggle,
-}: {
-  item: InventoryItem;
-  expanded: boolean;
-  pending: boolean;
-  onAdjust: (delta: number) => void;
-  onToggle: () => void;
-}): ReactNode {
+}: InventoryRowProps): ReactNode {
   const low = isLowStock(item);
-  const ItemIcon = itemIconFor(item.name);
   const progress = progressFor(item);
   const controlsId = `item-controls-${item.id}`;
 
@@ -90,7 +107,7 @@ function InventoryRow({
         onClick={onToggle}
       >
         <span className="item-icon" aria-hidden="true">
-          <ItemIcon size={23} strokeWidth={1.7} />
+          <ItemIcon name={item.name} />
         </span>
         <span className="item-name-group">
           <strong>{item.name}</strong>
@@ -156,19 +173,21 @@ function InventoryRow({
   );
 }
 
+type InventoryLedgerProps = {
+  items: InventoryItem[];
+  expandedItemId: string | null;
+  pendingItemId: string | null;
+  onAdjust: (item: InventoryItem, delta: number) => void;
+  onToggle: (itemId: string) => void;
+};
+
 export function InventoryLedger({
   items,
   expandedItemId,
   pendingItemId,
   onAdjust,
   onToggle,
-}: {
-  items: InventoryItem[];
-  expandedItemId: string | null;
-  pendingItemId: string | null;
-  onAdjust: (item: InventoryItem, delta: number) => void;
-  onToggle: (itemId: string) => void;
-}): ReactNode {
+}: InventoryLedgerProps): ReactNode {
   if (!items.length) {
     return (
       <section className="empty-state ledger-empty" aria-label="Pantry inventory">

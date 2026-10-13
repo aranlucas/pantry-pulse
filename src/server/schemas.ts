@@ -17,7 +17,7 @@ export const eventIdSchema = z
 export const rfidUidSchema = z
   .string()
   .trim()
-  .transform((value) => value.replace(/[^0-9a-f]/gi, "").toUpperCase())
+  .transform((value) => value.replaceAll(/[^0-9a-f]/gi, "").toUpperCase())
   .pipe(
     z
       .string()

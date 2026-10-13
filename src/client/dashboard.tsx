@@ -1,11 +1,27 @@
 import { Check, CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { ActivitySection } from "./ActivitySection";
+import { ActivitySection } from "./activity-section";
 import { AppHeader, MobileBottomNav, Spinner } from "./chrome";
-import { InventoryHeader, InventoryLedger } from "./Inventory";
-import { ShoppingReceipt } from "./ShoppingReceipt";
+import { InventoryHeader, InventoryLedger } from "./inventory";
+import { ShoppingReceipt } from "./shopping-receipt";
 import type { InventoryItem, PantrySnapshot, View } from "./types";
+
+type DashboardProps = {
+  snapshot: PantrySnapshot;
+  activeView: View;
+  expandedItemId: string | null;
+  pendingItemId: string | null;
+  refreshing: boolean;
+  notice: string | null;
+  error: string | null;
+  onAdjust: (item: InventoryItem, delta: number) => void;
+  onLink: () => void;
+  onLock: () => void;
+  onNavigate: (view: View) => void;
+  onRetry: () => void;
+  onToggle: (itemId: string) => void;
+};
 
 export function Dashboard({
   snapshot,
@@ -21,21 +37,7 @@ export function Dashboard({
   onNavigate,
   onRetry,
   onToggle,
-}: {
-  snapshot: PantrySnapshot;
-  activeView: View;
-  expandedItemId: string | null;
-  pendingItemId: string | null;
-  refreshing: boolean;
-  notice: string | null;
-  error: string | null;
-  onAdjust: (item: InventoryItem, delta: number) => void;
-  onLink: () => void;
-  onLock: () => void;
-  onNavigate: (view: View) => void;
-  onRetry: () => void;
-  onToggle: (itemId: string) => void;
-}): ReactNode {
+}: DashboardProps): ReactNode {
   return (
     <div className="dashboard-shell">
       <AppHeader activeView={activeView} onLock={onLock} onNavigate={onNavigate} />

@@ -27,7 +27,9 @@ function secured(response: Response, includeCsp = false): Response {
   result.headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
   result.headers.set("X-Frame-Options", "DENY");
 
-  if (includeCsp) result.headers.set("Content-Security-Policy", contentSecurityPolicy);
+  if (includeCsp) {
+    result.headers.set("Content-Security-Policy", contentSecurityPolicy);
+  }
 
   return result;
 }
@@ -46,6 +48,13 @@ function unauthorized(): Response {
       },
     },
   );
+}
+
+async function pruneAndReport(db: D1Database): Promise<void> {
+  const removed = await pruneInventoryEvents(db);
+  const tombstoneCount = await countEventTombstones(db);
+
+  console.info("inventory event retention", { removed, retentionDays: 90, tombstoneCount });
 }
 
 export default {
@@ -109,11 +118,6 @@ export default {
     return response;
   },
   scheduled(_controller, env, ctx): void {
-    ctx.waitUntil(
-      pruneInventoryEvents(env.DB).then(async (removed) => {
-        const tombstoneCount = await countEventTombstones(env.DB);
-        console.info("inventory event retention", { removed, retentionDays: 90, tombstoneCount });
-      }),
-    );
+    ctx.waitUntil(pruneAndReport(env.DB));
   },
 } satisfies ExportedHandler<Cloudflare.Env>;

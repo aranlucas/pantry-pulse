@@ -2,10 +2,10 @@ import { PackageOpen } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 
-import { AccessGate } from "./AccessGate";
+import { AccessGate } from "./access-gate";
 import { adjustItem, fetchSnapshot, isAuthError, linkItem } from "./api";
 import { Spinner } from "./chrome";
-import { Dashboard } from "./Dashboard";
+import { Dashboard } from "./dashboard";
 import { errorMessage } from "./format";
 import {
   EMPTY_LINK_FORM,
@@ -14,7 +14,7 @@ import {
   quantityCorrection,
   type LinkFormState,
 } from "./link-form";
-import { LinkTagDrawer } from "./LinkTagDrawer";
+import { LinkTagDrawer } from "./link-tag-drawer";
 import { scrollDashboardToView } from "./motion";
 import { clearSessionToken, readSessionToken, writeSessionToken } from "./session";
 import type { InventoryItem, LinkItemInput, PantrySnapshot, View } from "./types";
@@ -22,9 +22,14 @@ import type { InventoryItem, LinkItemInput, PantrySnapshot, View } from "./types
 type AuthState = "checking" | "locked" | "loading" | "ready";
 
 export function App(): ReactNode {
-  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [restoredToken] = useState(readSessionToken);
+
+  const [authState, setAuthState] = useState<AuthState>(
+    restoredToken === null ? "locked" : "checking",
+  );
+
   const [tokenInput, setTokenInput] = useState("");
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(restoredToken);
   const [snapshot, setSnapshot] = useState<PantrySnapshot | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +50,9 @@ export function App(): ReactNode {
   const acceptSnapshot = useCallback((next: PantrySnapshot): void => {
     setSnapshot(next);
     setExpandedItemId((current) => {
-      if (current && next.items.some((item) => item.id === current)) return current;
+      if (current && next.items.some((item) => item.id === current)) {
+        return current;
+      }
 
       return next.items[0]?.id ?? null;
     });
@@ -72,31 +79,29 @@ export function App(): ReactNode {
   }, []);
 
   useEffect(() => {
-    const savedToken = readSessionToken();
-
-    if (!savedToken) {
-      setAuthState("locked");
-
-      return;
-    }
-
     let cancelled = false;
-    setToken(savedToken);
-    void fetchSnapshot(savedToken)
-      .then((next) => {
-        if (cancelled) return;
+
+    const restore = async (savedToken: string): Promise<void> => {
+      const next = await fetchSnapshot(savedToken);
+
+      if (!cancelled) {
         acceptSnapshot(next);
         setAuthState("ready");
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        handleAuthFailure(cause);
+      }
+    };
+
+    if (restoredToken !== null) {
+      restore(restoredToken).catch((cause: unknown) => {
+        if (!cancelled) {
+          handleAuthFailure(cause);
+        }
       });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [acceptSnapshot, handleAuthFailure]);
+  }, [acceptSnapshot, handleAuthFailure, restoredToken]);
 
   const submitToken = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -123,7 +128,10 @@ export function App(): ReactNode {
   };
 
   const refresh = async (): Promise<void> => {
-    if (!token || refreshing) return;
+    if (!token || refreshing) {
+      return;
+    }
+
     setRefreshing(true);
     setError(null);
 
@@ -141,7 +149,10 @@ export function App(): ReactNode {
   };
 
   const handleAdjust = async (item: InventoryItem, delta: number): Promise<void> => {
-    if (!token || pendingItemId) return;
+    if (!token || pendingItemId) {
+      return;
+    }
+
     setPendingItemId(item.id);
     setError(null);
     setNotice(null);
@@ -185,7 +196,9 @@ export function App(): ReactNode {
   const submitLink = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
 
-    if (!token) return;
+    if (!token) {
+      return;
+    }
 
     if (!linkTargetId) {
       setDrawerError("Choose a pantry item before linking a tag.");
@@ -289,18 +302,19 @@ export function App(): ReactNode {
         onRetry={() => void refresh()}
         onToggle={(itemId) => setExpandedItemId((current) => (current === itemId ? null : itemId))}
       />
-      <LinkTagDrawer
-        open={drawerOpen}
-        items={snapshot.items}
-        targetItemId={linkTargetId}
-        form={linkForm}
-        busy={drawerBusy}
-        error={drawerError}
-        onClose={closeDrawer}
-        onFormChange={updateLinkField}
-        onTargetChange={changeLinkTarget}
-        onSubmit={(event) => void submitLink(event)}
-      />
+      {drawerOpen ? (
+        <LinkTagDrawer
+          items={snapshot.items}
+          targetItemId={linkTargetId}
+          form={linkForm}
+          busy={drawerBusy}
+          error={drawerError}
+          onClose={closeDrawer}
+          onFormChange={updateLinkField}
+          onTargetChange={changeLinkTarget}
+          onSubmit={(event) => void submitLink(event)}
+        />
+      ) : null}
     </>
   );
 }

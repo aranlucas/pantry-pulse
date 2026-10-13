@@ -5,7 +5,9 @@ import { useState } from "react";
 import { formatQuantity } from "./format";
 import type { ShoppingItem } from "./types";
 
-export function ShoppingReceipt({ items }: { items: ShoppingItem[] }): ReactNode {
+type ShoppingReceiptProps = { items: ShoppingItem[] };
+
+export function ShoppingReceipt({ items }: ShoppingReceiptProps): ReactNode {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
 
@@ -19,7 +21,10 @@ export function ShoppingReceipt({ items }: { items: ShoppingItem[] }): ReactNode
     setCopyError(null);
 
     try {
-      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard unavailable");
+      }
+
       await navigator.clipboard.writeText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2200);

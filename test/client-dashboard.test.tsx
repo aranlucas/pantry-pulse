@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Dashboard } from "../src/client/Dashboard";
+import { Dashboard } from "../src/client/dashboard";
 import type { PantrySnapshot } from "../src/client/types";
 
 const snapshot: PantrySnapshot = {
@@ -68,12 +68,12 @@ function renderDashboard(activeView: "pantry" | "queue" | "activity"): string {
       refreshing={false}
       notice={null}
       error={null}
-      onAdjust={() => undefined}
-      onLink={() => undefined}
-      onLock={() => undefined}
-      onNavigate={() => undefined}
-      onRetry={() => undefined}
-      onToggle={() => undefined}
+      onAdjust={() => {}}
+      onLink={() => {}}
+      onLock={() => {}}
+      onNavigate={() => {}}
+      onRetry={() => {}}
+      onToggle={() => {}}
     />,
   );
 }

@@ -1,9 +1,29 @@
-import { LoaderCircle, LogOut, Package, PackageOpen, ScanLine, ShoppingCart } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { LoaderCircle, LogOut, PackageOpen, ScanLine, ShoppingCart } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { View } from "./types";
 
-export function BrandMark({ onHome }: { onHome?: () => void } = {}): ReactNode {
+type BrandMarkProps = { onHome?: () => void };
+
+type SpinnerProps = { label: string };
+
+type AppHeaderProps = {
+  activeView: View;
+  onLock: () => void;
+  onNavigate: (view: View) => void;
+};
+
+type NavLink = { view: View; label: string };
+
+type MobileNavProps = {
+  activeView: View;
+  onNavigate: (view: View) => void;
+};
+
+type MobileNavLink = NavLink & { icon: LucideIcon };
+
+export function BrandMark({ onHome }: BrandMarkProps = {}): ReactNode {
   return (
     <a
       className="brand-lockup"
@@ -26,7 +46,7 @@ export function BrandMark({ onHome }: { onHome?: () => void } = {}): ReactNode {
   );
 }
 
-export function Spinner({ label }: { label: string }): ReactNode {
+export function Spinner({ label }: SpinnerProps): ReactNode {
   return (
     <span className="spinner-label">
       <LoaderCircle className="spin" size={17} strokeWidth={2} aria-hidden="true" />
@@ -35,16 +55,8 @@ export function Spinner({ label }: { label: string }): ReactNode {
   );
 }
 
-export function AppHeader({
-  activeView,
-  onLock,
-  onNavigate,
-}: {
-  activeView: View;
-  onLock: () => void;
-  onNavigate: (view: View) => void;
-}): ReactNode {
-  const links: Array<{ view: View; label: string }> = [
+export function AppHeader({ activeView, onLock, onNavigate }: AppHeaderProps): ReactNode {
+  const links: NavLink[] = [
     { view: "pantry", label: "Pantry" },
     { view: "queue", label: "Shopping queue" },
     { view: "activity", label: "Activity" },
@@ -81,14 +93,8 @@ export function AppHeader({
   );
 }
 
-export function MobileBottomNav({
-  activeView,
-  onNavigate,
-}: {
-  activeView: View;
-  onNavigate: (view: View) => void;
-}): ReactNode {
-  const links: Array<{ view: View; label: string; icon: typeof Package }> = [
+export function MobileBottomNav({ activeView, onNavigate }: MobileNavProps): ReactNode {
+  const links: MobileNavLink[] = [
     { view: "pantry", label: "Pantry", icon: PackageOpen },
     { view: "queue", label: "Queue", icon: ShoppingCart },
     { view: "activity", label: "Activity", icon: ScanLine },

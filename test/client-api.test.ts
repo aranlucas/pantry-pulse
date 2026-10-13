@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { quantityCorrection } from "../src/client/link-form";
-import { activityWasConsumed, decodeSnapshot } from "../src/client/snapshot";
+import { activityWasConsumed, snapshotSchema } from "../src/client/snapshot";
 
 const workerSnapshot = {
   generatedAt: "2026-09-17T00:00:00.000Z",
@@ -58,7 +58,7 @@ const workerSnapshot = {
 
 describe("client snapshot contract", () => {
   it("maps Worker snapshot fields without aliases", () => {
-    const snapshot = decodeSnapshot({
+    const snapshot = snapshotSchema.parse({
       ...workerSnapshot,
       station: { online: true, name: "ignored" },
       items: [
@@ -103,7 +103,7 @@ describe("client snapshot contract", () => {
   });
 
   it("ignores alias-only payloads that the Worker never sends", () => {
-    const snapshot = decodeSnapshot({
+    const snapshot = snapshotSchema.parse({
       inventory: [{ id: "ghost", onHand: 4, tagUid: "FFFF" }],
       shopping: [{ id: "ghost", amount: 3 }],
       events: [{ id: "ghost", kind: "consumed" }],
@@ -140,7 +140,7 @@ describe("link form stock corrections", () => {
 
 describe("tolerant snapshot boundary", () => {
   it("preserves numeric strings, empty identifiers and fallback values", () => {
-    const snapshot = decodeSnapshot({
+    const snapshot = snapshotSchema.parse({
       generatedAt: "known-time",
       summary: { itemCount: "0x10", lowStockCount: "  ", unitsNeeded: "Infinity" },
       items: [{ id: "", name: null, quantity: " 2.5 ", targetQuantity: false, rfidUid: "" }, null],
@@ -159,7 +159,7 @@ describe("tolerant snapshot boundary", () => {
     expect(snapshot.items[1]).toMatchObject({ id: "item-2", quantity: 0 });
     expect(snapshot.shoppingQueue[0]).toMatchObject({ itemId: "queue-1" });
     expect(snapshot.recentActivity[0]).toMatchObject({ eventId: "", source: "admin", delta: -2 });
-    expect(decodeSnapshot(null).items).toEqual([]);
-    expect(decodeSnapshot([]).shoppingQueue).toEqual([]);
+    expect(snapshotSchema.parse(null).items).toEqual([]);
+    expect(snapshotSchema.parse([]).shoppingQueue).toEqual([]);
   });
 });
