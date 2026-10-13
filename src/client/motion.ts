@@ -14,22 +14,21 @@ export function motionSafeScrollBehavior(reducedMotion = prefersReducedMotion())
   return reducedMotion ? "auto" : "smooth";
 }
 
-export function scrollDashboardToView(
-  view: View,
-  options: {
-    isDesktop?: boolean;
-    behavior?: ScrollBehavior;
-    getElementById?: (
-      id: string,
-    ) => { scrollIntoView(options?: ScrollIntoViewOptions): void } | null;
-    scrollTo?: (options: ScrollToOptions) => void;
-  } = {},
-): void {
+type ScrollTarget = { scrollIntoView(options?: ScrollIntoViewOptions): void };
+
+type ScrollDashboardOptions = {
+  isDesktop?: boolean;
+  behavior?: ScrollBehavior;
+  getElementById?: (id: string) => ScrollTarget | null;
+  scrollTo?: (options: ScrollToOptions) => void;
+};
+
+export function scrollDashboardToView(view: View, options: ScrollDashboardOptions = {}): void {
   const behavior = options.behavior ?? motionSafeScrollBehavior();
   const isDesktop = options.isDesktop ?? window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
 
   if (isDesktop) {
-    const getElementById = options.getElementById ?? ((id) => document.getElementById(id));
+    const getElementById = options.getElementById ?? ((id) => document.querySelector(`#${id}`));
     getElementById(`${view}-view`)?.scrollIntoView({ behavior, block: "start" });
 
     return;

@@ -12,7 +12,7 @@ describe("API error boundary", () => {
     [null, 401, "That token did not unlock this pantry."],
   ])("retains message precedence and fallbacks for %j", async (body, status, message) => {
     vi.stubGlobal("window", { setTimeout, clearTimeout });
-    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body), { status }));
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response(JSON.stringify(body), { status })));
     await expect(fetchSnapshot("test-token")).rejects.toThrow(message);
   });
 });

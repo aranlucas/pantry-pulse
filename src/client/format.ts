@@ -13,9 +13,13 @@ export function formatRfidUid(rfidUid: string | null): string {
 }
 
 export function formatActivitySource(source: ActivityEvent["source"]): string {
-  if (source === "device") return "RFID station";
+  if (source === "device") {
+    return "RFID station";
+  }
 
-  if (source === "mcp") return "MCP";
+  if (source === "mcp") {
+    return "MCP";
+  }
 
   return "Dashboard";
 }
@@ -23,7 +27,9 @@ export function formatActivitySource(source: ActivityEvent["source"]): string {
 export function formatDate(value: string): string {
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "Unknown time";
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",

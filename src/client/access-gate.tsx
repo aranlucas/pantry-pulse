@@ -3,19 +3,21 @@ import type { FormEvent, ReactNode } from "react";
 
 import { BrandMark, Spinner } from "./chrome";
 
+type AccessGateProps = {
+  token: string;
+  error: string | null;
+  loading: boolean;
+  onTokenChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+};
+
 export function AccessGate({
   token,
   error,
   loading,
   onTokenChange,
   onSubmit,
-}: {
-  token: string;
-  error: string | null;
-  loading: boolean;
-  onTokenChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}): ReactNode {
+}: AccessGateProps): ReactNode {
   return (
     <div className="access-shell">
       <header className="app-header access-header">

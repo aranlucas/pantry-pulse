@@ -1,12 +1,14 @@
 const TOKEN_STORAGE_KEY = "pantry-pulse-admin-token";
 
 export function readSessionToken(): string | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined") {
+    return null;
+  }
 
   try {
     const value = window.sessionStorage.getItem(TOKEN_STORAGE_KEY)?.trim();
 
-    return value || null;
+    return value === undefined || value === "" ? null : value;
   } catch {
     return null;
   }

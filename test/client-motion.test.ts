@@ -8,6 +8,8 @@ import {
 } from "../src/client/motion";
 import type { View } from "../src/client/types";
 
+type ScrollCall = { id: string; behavior: ScrollBehavior };
+
 describe("dashboard motion", () => {
   it("uses instant scrolling when the user prefers reduced motion", () => {
     expect(prefersReducedMotion((query) => query === REDUCED_MOTION_QUERY)).toBe(true);
@@ -17,7 +19,7 @@ describe("dashboard motion", () => {
   });
 
   it("scrolls the unique view anchor on desktop and the page top on small screens", () => {
-    const desktop: Array<{ id: string; behavior: ScrollBehavior }> = [];
+    const desktop: ScrollCall[] = [];
     const mobile: ScrollToOptions[] = [];
 
     scrollDashboardToView("activity", {

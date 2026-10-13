@@ -15,11 +15,15 @@ async function secureEqual(candidate: string, expected: string): Promise<boolean
 function bearerToken(request: Request): string | null {
   const authorization = request.headers.get("Authorization");
 
-  if (!authorization) return null;
+  if (!authorization) {
+    return null;
+  }
 
   const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
 
-  return match?.[1]?.trim() || null;
+  const token = match?.[1]?.trim();
+
+  return token === undefined || token === "" ? null : token;
 }
 
 export async function hasAdminAccess(request: Request, env: Cloudflare.Env): Promise<boolean> {
@@ -40,11 +44,17 @@ export async function getMcpAccess(
 ): Promise<McpAccess | null> {
   const candidate = bearerToken(request);
 
-  if (!candidate) return null;
+  if (!candidate) {
+    return null;
+  }
 
-  if (env.MCP_WRITE_TOKEN && (await secureEqual(candidate, env.MCP_WRITE_TOKEN))) return "write";
+  if (env.MCP_WRITE_TOKEN && (await secureEqual(candidate, env.MCP_WRITE_TOKEN))) {
+    return "write";
+  }
 
-  if (env.MCP_READ_TOKEN && (await secureEqual(candidate, env.MCP_READ_TOKEN))) return "read";
+  if (env.MCP_READ_TOKEN && (await secureEqual(candidate, env.MCP_READ_TOKEN))) {
+    return "read";
+  }
 
   return null;
 }

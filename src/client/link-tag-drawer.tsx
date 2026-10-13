@@ -6,19 +6,7 @@ import { Spinner } from "./chrome";
 import type { LinkFormState } from "./link-form";
 import type { InventoryItem } from "./types";
 
-export function LinkTagDrawer({
-  open,
-  items,
-  targetItemId,
-  form,
-  busy,
-  error,
-  onClose,
-  onFormChange,
-  onTargetChange,
-  onSubmit,
-}: {
-  open: boolean;
+type LinkTagDrawerProps = {
   items: InventoryItem[];
   targetItemId: string;
   form: LinkFormState;
@@ -28,12 +16,23 @@ export function LinkTagDrawer({
   onFormChange: (field: keyof LinkFormState, value: string) => void;
   onTargetChange: (itemId: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}): ReactNode {
+};
+
+export function LinkTagDrawer({
+  items,
+  targetItemId,
+  form,
+  busy,
+  error,
+  onClose,
+  onFormChange,
+  onTargetChange,
+  onSubmit,
+}: LinkTagDrawerProps): ReactNode {
   const drawerRef = useRef<HTMLElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => firstFieldRef.current?.focus());
 
@@ -45,15 +44,18 @@ export function LinkTagDrawer({
         return;
       }
 
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab") {
+        return;
+      }
 
-      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
-      );
+      const focusable = [
+        ...(drawerRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
+        ) ?? []),
+      ];
 
-      if (!focusable?.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const first = focusable.at(0);
+      const last = focusable.at(-1);
 
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
@@ -73,9 +75,7 @@ export function LinkTagDrawer({
       document.body.classList.remove("drawer-open");
       previous?.focus();
     };
-  }, [onClose, open]);
-
-  if (!open) return null;
+  }, [onClose]);
 
   return (
     <div className="drawer-layer">

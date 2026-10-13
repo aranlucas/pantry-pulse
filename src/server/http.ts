@@ -45,20 +45,22 @@ async function body<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
     throw new PantryError("Request body is too large", 413, "body_too_large");
   }
 
-  if (!request.body) throw new PantryError("Request body is not valid JSON", 400, "invalid_json");
+  if (!request.body) {
+    throw new PantryError("Request body is not valid JSON", 400, "invalid_json");
+  }
 
   const chunks: Uint8Array[] = [];
-  const reader = request.body.getReader();
   let received = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
+  // Breaking out of `for await` cancels the stream, so oversized bodies stop reading.
+  for await (const value of request.body) {
+    if (!(value instanceof Uint8Array)) {
+      throw new PantryError("Request body is not valid JSON", 400, "invalid_json");
+    }
 
-    if (done) break;
     received += value.byteLength;
 
     if (received > maxBodyBytes) {
-      await reader.cancel("request body limit exceeded");
       throw new PantryError("Request body is too large", 413, "body_too_large");
     }
 
@@ -147,7 +149,9 @@ async function route(request: Request, env: Cloudflare.Env): Promise<Response> {
   const pathname = url.pathname.replace(/\/$/, "") || "/";
 
   if (pathname === "/api/device/scans" && request.method === "POST") {
-    if (!(await hasDeviceAccess(request, env))) return unauthorized();
+    if (!(await hasDeviceAccess(request, env))) {
+      return unauthorized();
+    }
 
     const attemptLimit = await env.DEVICE_ATTEMPT_RATE_LIMIT.limit({ key: env.DEVICE_ID });
 
@@ -182,7 +186,9 @@ async function route(request: Request, env: Cloudflare.Env): Promise<Response> {
     return json(result, result.idempotentReplay ? 200 : 201);
   }
 
-  if (!(await hasAdminAccess(request, env))) return unauthorized();
+  if (!(await hasAdminAccess(request, env))) {
+    return unauthorized();
+  }
 
   if (pathname === "/api/snapshot" && request.method === "GET") {
     return json(await getSnapshot(env.DB));
@@ -194,10 +200,10 @@ async function route(request: Request, env: Cloudflare.Env): Promise<Response> {
     return json({ item: await createItem(env.DB, input) }, 201);
   }
 
-  const adjustmentMatch = /^\/api\/items\/([^/]+)\/adjust$/.exec(pathname);
+  const adjustmentId = /^\/api\/items\/([^/]+)\/adjust$/.exec(pathname)?.[1];
 
-  if (adjustmentMatch && request.method === "POST") {
-    const itemId = decodedItemId(adjustmentMatch[1]!);
+  if (adjustmentId !== undefined && request.method === "POST") {
+    const itemId = decodedItemId(adjustmentId);
     const input = await body(request, adjustInventorySchema);
 
     return json(
@@ -209,10 +215,10 @@ async function route(request: Request, env: Cloudflare.Env): Promise<Response> {
     );
   }
 
-  const linkMatch = /^\/api\/items\/([^/]+)\/link$/.exec(pathname);
+  const linkId = /^\/api\/items\/([^/]+)\/link$/.exec(pathname)?.[1];
 
-  if (linkMatch && request.method === "POST") {
-    const itemId = decodedItemId(linkMatch[1]!);
+  if (linkId !== undefined && request.method === "POST") {
+    const itemId = decodedItemId(linkId);
     const input = await body(request, dashboardLinkItemSchema);
 
     return json({

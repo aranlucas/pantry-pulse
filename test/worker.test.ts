@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { SELF, env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { assert, beforeEach, describe, expect, it } from "vitest";
 import { handleApi } from "../src/server/http";
 import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "../src/server/repository";
 
@@ -13,7 +13,11 @@ const mcpReadToken = "test-mcp-read-token-with-enough-entropy";
 
 const mcpWriteToken = "test-mcp-write-token-with-enough-entropy";
 
-function authorization(token: string): HeadersInit {
+type AuthorizationHeader = { Authorization: string };
+
+type CountRow = { count: number };
+
+function authorization(token: string): AuthorizationHeader {
   return { Authorization: `Bearer ${token}` };
 }
 
@@ -34,7 +38,7 @@ async function seedItems(): Promise<void> {
   ]);
 }
 
-async function postJson<T>(path: string, token: string, data: T): Promise<Response> {
+function postJson<T>(path: string, token: string, data: T): Promise<Response> {
   return SELF.fetch(`https://example.test${path}`, {
     method: "POST",
     headers: {
@@ -45,7 +49,7 @@ async function postJson<T>(path: string, token: string, data: T): Promise<Respon
   });
 }
 
-async function mcpRequest<T>(
+function mcpRequest<T>(
   method: string,
   params: T,
   id: number,
@@ -77,7 +81,9 @@ async function mcpJson(response: Response): Promise<JsonValue> {
     .find((line) => line.startsWith("data: "))
     ?.slice(6);
 
-  if (!data) throw new Error("MCP response did not contain an SSE data event");
+  if (!data) {
+    throw new Error("MCP response did not contain an SSE data event");
+  }
 
   return z.json().parse(JSON.parse(data));
 }
@@ -150,9 +156,9 @@ describe("Pantry Pulse Worker", () => {
     expect(retry.status).toBe(200);
     expect(await retry.json()).toMatchObject({ idempotentReplay: true, item: { quantity: 2 } });
 
-    const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first<{
-      count: number;
-    }>();
+    const count = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM inventory_events",
+    ).first<CountRow>();
 
     expect(count?.count).toBe(1);
   });
@@ -235,13 +241,15 @@ describe("Pantry Pulse Worker", () => {
       }),
     ]);
 
-    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(
+      responses.map((response) => response.status).toSorted((left, right) => left - right),
+    ).toEqual([200, 409]);
 
     const stored = await env.DB.prepare(
       "SELECT COUNT(*) AS count FROM inventory_events WHERE id = ?",
     )
       .bind(eventId)
-      .first<{ count: number }>();
+      .first<CountRow>();
 
     expect(stored?.count).toBe(1);
   });
@@ -283,18 +291,18 @@ describe("Pantry Pulse Worker", () => {
       ASSETS: env.ASSETS,
       DB: env.DB,
       DEVICE_ATTEMPT_RATE_LIMIT: {
-        limit: async () => {
+        limit: () => {
           attemptCalls += 1;
 
-          return { success: true };
+          return Promise.resolve({ success: true });
         },
       },
       DEVICE_ID: "pantry-station-1",
       DEVICE_RATE_LIMIT: {
-        limit: async () => {
+        limit: () => {
           writeCalls += 1;
 
-          return { success: true };
+          return Promise.resolve({ success: true });
         },
       },
       DEVICE_TOKEN: deviceToken,
@@ -405,10 +413,7 @@ describe("Pantry Pulse Worker", () => {
     const paused = pausedBatch(env.DB);
     const pending = linkItem(paused.db, "itm-coffee", { name: "Stale name", quantity: 4 });
 
-    const rejected = expect(pending).rejects.toMatchObject({
-      status: 409,
-      code: "inventory_conflict",
-    });
+    const settled = Promise.allSettled([pending]);
 
     await paused.ready;
 
@@ -424,7 +429,15 @@ describe("Pantry Pulse Worker", () => {
       paused.release();
     }
 
-    await rejected;
+    expect(await settled).toMatchObject([
+      {
+        status: "rejected",
+        reason: {
+          status: 409,
+          code: "inventory_conflict",
+        },
+      },
+    ]);
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
       name: "Coffee beans",
       quantity: 0,
@@ -438,10 +451,7 @@ describe("Pantry Pulse Worker", () => {
     const paused = pausedBatch(env.DB);
     const pending = linkItem(paused.db, "itm-coffee", { quantity: 4 });
 
-    const rejected = expect(pending).rejects.toMatchObject({
-      status: 409,
-      code: "inventory_conflict",
-    });
+    const settled = Promise.allSettled([pending]);
 
     await paused.ready;
 
@@ -451,7 +461,15 @@ describe("Pantry Pulse Worker", () => {
       paused.release();
     }
 
-    await rejected;
+    expect(await settled).toMatchObject([
+      {
+        status: "rejected",
+        reason: {
+          status: 409,
+          code: "inventory_conflict",
+        },
+      },
+    ]);
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 3 });
     expect(await env.DB.prepare("SELECT delta, reason FROM inventory_events").all()).toMatchObject({
       results: [{ delta: 2, reason: "dashboard setup" }],
@@ -490,11 +508,14 @@ describe("Pantry Pulse Worker", () => {
       postJson("/api/items/itm-coffee/link", adminToken, { onHand: 4, expectedQuantity: 1 }),
     ]);
 
-    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(
+      responses.map((response) => response.status).toSorted((left, right) => left - right),
+    ).toEqual([200, 409]);
     const item = await getItem(env.DB, "itm-coffee");
     expect([3, 4]).toContain(item?.quantity);
+    assert(item);
     expect(await env.DB.prepare("SELECT delta FROM inventory_events").all()).toMatchObject({
-      results: [{ delta: item!.quantity - 1 }],
+      results: [{ delta: item.quantity - 1 }],
     });
   });
 
@@ -565,10 +586,7 @@ describe("Pantry Pulse Worker", () => {
       quantity: 3,
     });
 
-    const rejected = expect(pending).rejects.toMatchObject({
-      status: 422,
-      code: "incomplete_catalog_link",
-    });
+    const settled = Promise.allSettled([pending]);
 
     await paused.ready;
 
@@ -578,7 +596,15 @@ describe("Pantry Pulse Worker", () => {
       paused.release();
     }
 
-    await rejected;
+    expect(await settled).toMatchObject([
+      {
+        status: "rejected",
+        reason: {
+          status: 422,
+          code: "incomplete_catalog_link",
+        },
+      },
+    ]);
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({
       catalogProvider: null,
       providerItemId: null,

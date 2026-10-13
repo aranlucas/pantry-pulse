@@ -47,8 +47,39 @@ export interface AdjustmentResult {
   idempotentReplay: boolean;
 }
 
+type CreateItemInput = {
+  id?: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  targetQuantity: number;
+};
+
+type ItemLinkPatch = {
+  rfidUid?: string | null;
+  catalogProvider?: string | null;
+  providerItemId?: string | null;
+  name?: string;
+  unit?: string | null;
+  quantity?: number | null;
+  expectedQuantity?: number;
+  targetQuantity?: number | null;
+};
+
+type CountRow = { count: number };
+
 function changes(result: D1Result): number {
   return result.meta.changes ?? 0;
+}
+
+function batchResult<T>(results: D1Result<T>[], index: number): D1Result<T> {
+  const result = results.at(index);
+
+  if (result === undefined) {
+    throw new Error(`D1 batch returned no result at index ${index}`);
+  }
+
+  return result;
 }
 
 async function getEvent(db: D1Database, eventId: string): Promise<EventRow | null> {
@@ -68,7 +99,9 @@ async function getEvent(db: D1Database, eventId: string): Promise<EventRow | nul
     .bind(eventId)
     .first<EventRow>();
 
-  if (active) return active;
+  if (active) {
+    return active;
+  }
 
   return db
     .prepare(
@@ -107,30 +140,21 @@ function assertMatchingEvent(existing: EventRow, input: AdjustmentInput): void {
   }
 }
 
-export async function getItem(db: D1Database, itemId: string): Promise<PantryItem | null> {
+export function getItem(db: D1Database, itemId: string): Promise<PantryItem | null> {
   return db
     .prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`)
     .bind(itemId)
     .first<PantryItem>();
 }
 
-export async function getItemByTag(db: D1Database, rfidUid: string): Promise<PantryItem | null> {
+export function getItemByTag(db: D1Database, rfidUid: string): Promise<PantryItem | null> {
   return db
     .prepare(`SELECT ${itemColumns} FROM items WHERE rfid_uid = ?`)
     .bind(rfidUid)
     .first<PantryItem>();
 }
 
-export async function createItem(
-  db: D1Database,
-  input: {
-    id?: string;
-    name: string;
-    unit: string;
-    quantity: number;
-    targetQuantity: number;
-  },
-): Promise<PantryItem> {
+export async function createItem(db: D1Database, input: CreateItemInput): Promise<PantryItem> {
   const id = input.id ?? `itm-${crypto.randomUUID()}`;
 
   try {
@@ -257,7 +281,7 @@ export async function applyAdjustment(
   return {
     item: updated,
     eventId: input.eventId,
-    idempotentReplay: changes(results[0]!) === 0,
+    idempotentReplay: changes(batchResult(results, 0)) === 0,
   };
 }
 
@@ -269,16 +293,7 @@ export async function applyAdjustment(
 export async function linkItem(
   db: D1Database,
   itemId: string,
-  patch: {
-    rfidUid?: string | null;
-    catalogProvider?: string | null;
-    providerItemId?: string | null;
-    name?: string;
-    unit?: string | null;
-    quantity?: number | null;
-    expectedQuantity?: number;
-    targetQuantity?: number | null;
-  },
+  patch: ItemLinkPatch,
 ): Promise<PantryItem> {
   const existing = await getItem(db, itemId);
 
@@ -296,26 +311,44 @@ export async function linkItem(
     values.push(value);
   };
 
-  if (patch.name !== undefined) set("name", patch.name);
+  if (patch.name !== undefined) {
+    set("name", patch.name);
+  }
 
-  if (patch.unit != null) set("unit", patch.unit);
+  if (patch.unit != null) {
+    set("unit", patch.unit);
+  }
 
-  if (patch.targetQuantity != null) set("target_quantity", patch.targetQuantity);
+  if (patch.targetQuantity != null) {
+    set("target_quantity", patch.targetQuantity);
+  }
 
-  if (patch.rfidUid !== undefined) set("rfid_uid", patch.rfidUid);
+  if (patch.rfidUid !== undefined) {
+    set("rfid_uid", patch.rfidUid);
+  }
 
-  if (patch.catalogProvider !== undefined) set("catalog_provider", patch.catalogProvider);
+  if (patch.catalogProvider !== undefined) {
+    set("catalog_provider", patch.catalogProvider);
+  }
 
-  if (patch.providerItemId !== undefined) set("provider_item_id", patch.providerItemId);
+  if (patch.providerItemId !== undefined) {
+    set("provider_item_id", patch.providerItemId);
+  }
 
   const expectedQuantity = patch.expectedQuantity ?? existing.quantity;
-  const correctingQuantity = patch.quantity != null;
+  const correctedQuantity = patch.quantity;
+  const correctingQuantity = correctedQuantity != null;
 
-  if (correctingQuantity) set("quantity", patch.quantity!);
+  if (correctingQuantity) {
+    set("quantity", correctedQuantity);
+  }
+
   assignments.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
   values.push(itemId);
 
-  if (correctingQuantity) values.push(expectedQuantity);
+  if (correctingQuantity) {
+    values.push(expectedQuantity);
+  }
 
   try {
     const statements: D1PreparedStatement[] = [];
@@ -354,7 +387,7 @@ export async function linkItem(
     );
     const results = await db.batch(statements);
 
-    if (changes(results[results.length - 1]!) === 0) {
+    if (changes(batchResult(results, -1)) === 0) {
       throw new PantryError(
         "Inventory changed before this correction completed. Refresh the pantry and try again.",
         409,
@@ -421,8 +454,8 @@ export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
     ),
   ]);
 
-  const itemsResult = queryResults[0]!;
-  const activityResult = queryResults[1]!;
+  const itemsResult = batchResult(queryResults, 0);
+  const activityResult = batchResult(queryResults, 1);
   // SAFETY: D1 batch preserves statement order; the first SELECT uses itemColumns,
   // whose aliases and database columns exactly match PantryItem.
   const items = itemsResult.results as PantryItem[];
@@ -483,13 +516,13 @@ export async function pruneInventoryEvents(db: D1Database, retentionDays = 90): 
       .bind(cutoff),
   ]);
 
-  return changes(results[1]!);
+  return changes(batchResult(results, 1));
 }
 
 export async function countEventTombstones(db: D1Database): Promise<number> {
   const result = await db
     .prepare("SELECT COUNT(*) AS count FROM event_tombstones")
-    .first<{ count: number }>();
+    .first<CountRow>();
 
   return result?.count ?? 0;
 }

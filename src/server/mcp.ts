@@ -33,8 +33,10 @@ function result<T extends Record<string, unknown>>(value: T) {
 }
 
 function toolError(cause: unknown) {
-  if (!(cause instanceof PantryError))
+  if (!(cause instanceof PantryError)) {
     console.error("Unexpected Pantry Pulse MCP tool error", cause);
+  }
+
   const message = cause instanceof PantryError ? cause.message : "Pantry operation failed";
 
   return {
@@ -140,7 +142,7 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
     },
   );
 
-  if (access === "write")
+  if (access === "write") {
     server.registerTool(
       "pantry_adjust",
       {
@@ -164,8 +166,9 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
         }
       },
     );
+  }
 
-  if (access === "write")
+  if (access === "write") {
     server.registerTool(
       "pantry_link_item",
       {
@@ -189,6 +192,7 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
         }
       },
     );
+  }
 
   return server;
 }
