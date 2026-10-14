@@ -139,6 +139,33 @@ describe("link form stock corrections", () => {
 });
 
 describe("tolerant snapshot boundary", () => {
+  it.each([undefined, null, 0, false, {}, []])(
+    "keeps positional fallback IDs for invalid identifiers: %j",
+    (identifier) => {
+      const snapshot = snapshotSchema.parse({
+        items: [{ id: identifier }],
+        shoppingQueue: [{ itemId: identifier }],
+        recentActivity: [{ eventId: identifier }],
+      });
+
+      expect(snapshot.items[0]?.id).toBe("item-1");
+      expect(snapshot.shoppingQueue[0]?.itemId).toBe("queue-1");
+      expect(snapshot.recentActivity[0]?.eventId).toBe("event-1");
+    },
+  );
+
+  it.each(["", "stable-id"])("preserves valid string identifiers: %j", (identifier) => {
+    const snapshot = snapshotSchema.parse({
+      items: [{ id: identifier }],
+      shoppingQueue: [{ itemId: identifier }],
+      recentActivity: [{ eventId: identifier }],
+    });
+
+    expect(snapshot.items[0]?.id).toBe(identifier);
+    expect(snapshot.shoppingQueue[0]?.itemId).toBe(identifier);
+    expect(snapshot.recentActivity[0]?.eventId).toBe(identifier);
+  });
+
   it("preserves numeric strings, empty identifiers and fallback values", () => {
     const snapshot = snapshotSchema.parse({
       generatedAt: "known-time",

@@ -34,6 +34,8 @@ function result<T extends Record<string, unknown>>(value: T) {
 
 function toolError(cause: unknown) {
   if (!(cause instanceof PantryError)) {
+    // Keep unexpected tool failures observable while returning a generic public error.
+    // oxlint-disable-next-line no-console
     console.error("Unexpected Pantry Pulse MCP tool error", cause);
   }
 

@@ -16,8 +16,8 @@ const number = z
   ])
   .catch(0);
 
-// Zod's catch() requires an explicit fallback value.
-const identifier = z.string().optional().catch(undefined);
+// Missing or invalid identifiers fall back to their stable position-based IDs.
+const identifier = z.string().nullable().catch(null);
 
 const inventoryFields = z.object({
   id: identifier,
