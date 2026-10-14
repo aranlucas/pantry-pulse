@@ -315,11 +315,11 @@ export async function linkItem(
     set("name", patch.name);
   }
 
-  if (patch.unit != null) {
+  if (patch.unit !== null && patch.unit !== undefined) {
     set("unit", patch.unit);
   }
 
-  if (patch.targetQuantity != null) {
+  if (patch.targetQuantity !== null && patch.targetQuantity !== undefined) {
     set("target_quantity", patch.targetQuantity);
   }
 
@@ -337,7 +337,7 @@ export async function linkItem(
 
   const expectedQuantity = patch.expectedQuantity ?? existing.quantity;
   const correctedQuantity = patch.quantity;
-  const correctingQuantity = correctedQuantity != null;
+  const correctingQuantity = correctedQuantity !== null && correctedQuantity !== undefined;
 
   if (correctingQuantity) {
     set("quantity", correctedQuantity);

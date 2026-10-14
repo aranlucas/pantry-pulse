@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchSnapshot } from "../src/client/api";
+import { fetchSnapshot } from "@/client/api";
 
 describe("API error boundary", () => {
   afterEach(() => vi.unstubAllGlobals());

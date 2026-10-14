@@ -2,8 +2,8 @@ import { z } from "zod";
 
 import { SELF, env } from "cloudflare:test";
 import { assert, beforeEach, describe, expect, it } from "vitest";
-import { handleApi } from "../src/server/http";
-import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "../src/server/repository";
+import { handleApi } from "@/server/http";
+import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "@/server/repository";
 
 const adminToken = "test-admin-token-with-enough-entropy";
 
