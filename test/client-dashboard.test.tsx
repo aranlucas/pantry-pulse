@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Dashboard } from "../src/client/dashboard";
-import type { PantrySnapshot } from "../src/client/types";
+import { Dashboard } from "@/client/dashboard";
+import type { PantrySnapshot } from "@/client/types";
 
 const snapshot: PantrySnapshot = {
   generatedAt: "2026-09-17T00:00:00.000Z",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { quantityCorrection } from "../src/client/link-form";
-import { activityWasConsumed, snapshotSchema } from "../src/client/snapshot";
+import { quantityCorrection } from "@/client/link-form";
+import { activityWasConsumed, snapshotSchema } from "@/client/snapshot";
 
 const workerSnapshot = {
   generatedAt: "2026-09-17T00:00:00.000Z",

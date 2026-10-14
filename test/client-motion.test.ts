@@ -5,8 +5,8 @@ import {
   prefersReducedMotion,
   REDUCED_MOTION_QUERY,
   scrollDashboardToView,
-} from "../src/client/motion";
-import type { View } from "../src/client/types";
+} from "@/client/motion";
+import type { View } from "@/client/types";
 
 type ScrollCall = { id: string; behavior: ScrollBehavior };
 
