@@ -21,7 +21,8 @@
     "test": "vitest run --config vitest.client.config.ts && vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm cf-typegen && tsc --project tsconfig.json",
-    "cf": "cf"
+    "cf": "cf",
+    "prepare": "husky"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",
@@ -40,6 +41,8 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "cf": "1.0.0-beta.17",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "oxfmt": "^0.73.0",
     "oxlint": "^1.88.0",
     "oxlint-tsgolint": "^7.0.2004",
@@ -47,6 +50,15 @@
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.5"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": [
+      "oxlint --fix",
+      "oxfmt --no-error-on-unmatched-pattern"
+    ],
+    "*.{json,jsonc,json5,css,scss,md,mdx,yml,yaml,html,toml,vue,svelte,astro,graphql}": [
+      "oxfmt --no-error-on-unmatched-pattern"
+    ]
   },
   "engines": {
     "node": ">=24"
