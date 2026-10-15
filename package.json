@@ -25,31 +25,31 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",
-    "agents": "0.28.0",
-    "lucide-react": "1.55.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "zod": "4.6.6"
+    "agents": "0.28.1",
+    "lucide-react": "1.57.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@aranlucas/oxforge": "0.2.2",
     "@cloudflare/vite-plugin": "2.0.0-beta.sha-805ec1ff3",
-    "@cloudflare/vitest-plugin": "1.4.0",
+    "@cloudflare/vitest-plugin": "1.4.3",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
-    "cf": "1.0.0-beta.14",
+    "cf": "1.0.0-beta.17",
     "oxfmt": "^0.73.0",
     "oxlint": "^1.88.0",
     "oxlint-tsgolint": "^7.0.2004",
-    "portless": "0.15.7",
+    "portless": "0.15.8",
     "typescript": "7.0.2",
     "vite": "8.3.4",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@12.10.1"
+  "packageManager": "pnpm@12.11.2"
 }
