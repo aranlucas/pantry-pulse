@@ -33,7 +33,7 @@ A non-null `onHand` is an absolute stock correction. Send `expectedQuantity` wit
 Requirements:
 
 - Node.js 24 or newer.
-- pnpm 12.10.1 (`packageManager` in `package.json`). Cloudflare CLI (`cf`) and the Cloudflare Vite plugin are installed by the project.
+- The pnpm version pinned by `packageManager` in `package.json`. Cloudflare CLI (`cf`) and the Cloudflare Vite plugin are installed by the project.
 - PlatformIO and an ESP32 DevKit with an MFRC522 reader only when working on firmware.
 
 Install dependencies and create untracked local Worker credentials:
