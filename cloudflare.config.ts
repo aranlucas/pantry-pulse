@@ -3,7 +3,7 @@ import { bindings, defineConfig, triggers } from "cf/config";
 export default defineConfig({
   worker: {
     name: "pantry-pulse",
-    compatibilityDate: "2026-08-30",
+    compatibilityDate: "2026-11-03",
     compatibilityFlags: ["nodejs_compat"],
     entrypoint: "src/worker.ts",
     observability: {

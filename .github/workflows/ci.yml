@@ -45,7 +45,7 @@ jobs:
             run: pnpm test
 
           - name: Build and deploy dry run
-            run: pnpm build && pnpm exec cf deploy --prebuilt --mode production --dry-run
+            run: pnpm exec cf deploy --dry-run
 
   firmware:
     if: ${{ github.event.pull_request.draft != true }}
