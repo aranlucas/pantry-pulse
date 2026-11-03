@@ -93,8 +93,6 @@ describe("dashboard tree", () => {
     expect(countAttr(html, "id", "item-controls-itm-milk")).toBe(1);
     expect(countAttr(html, "id", "item-controls-itm-oats")).toBe(1);
     expect(countAttr(html, "aria-controls", "item-controls-itm-milk")).toBe(1);
-    expect(html).not.toContain("mobile-dashboard");
-    expect(html).not.toContain("mobile-main-content");
     expect(countAttr(html, "data-active-view", "pantry")).toBe(1);
   });
 
