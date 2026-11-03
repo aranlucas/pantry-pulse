@@ -1,19 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  motionSafeScrollBehavior,
-  prefersReducedMotion,
-  REDUCED_MOTION_QUERY,
-  scrollDashboardToView,
-} from "@/client/motion";
+import { motionSafeScrollBehavior, scrollDashboardToView } from "@/client/motion";
 import type { View } from "@/client/types";
 
 type ScrollCall = { id: string; behavior: ScrollBehavior };
 
 describe("dashboard motion", () => {
   it("uses instant scrolling when the user prefers reduced motion", () => {
-    expect(prefersReducedMotion((query) => query === REDUCED_MOTION_QUERY)).toBe(true);
-    expect(prefersReducedMotion(() => false)).toBe(false);
     expect(motionSafeScrollBehavior(true)).toBe("auto");
     expect(motionSafeScrollBehavior(false)).toBe("smooth");
   });

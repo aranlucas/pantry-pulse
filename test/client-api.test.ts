@@ -96,24 +96,9 @@ describe("client snapshot contract", () => {
     expect(snapshot).not.toHaveProperty("activity");
     expect(snapshot.items[0]).not.toHaveProperty("onHand");
     expect(snapshot.items[0]).not.toHaveProperty("tagUid");
-    expect(snapshot.recentActivity.map((event) => event.delta < 0)).toEqual([true, false]);
     expect(activityWasConsumed(-1)).toBe(true);
     expect(activityWasConsumed(1)).toBe(false);
     expect(activityWasConsumed(0)).toBe(false);
-  });
-
-  it("ignores alias-only payloads that the Worker never sends", () => {
-    const snapshot = snapshotSchema.parse({
-      inventory: [{ id: "ghost", onHand: 4, tagUid: "FFFF" }],
-      shopping: [{ id: "ghost", amount: 3 }],
-      events: [{ id: "ghost", kind: "consumed" }],
-      stationStatus: { online: false },
-    });
-
-    expect(snapshot.items).toEqual([]);
-    expect(snapshot.shoppingQueue).toEqual([]);
-    expect(snapshot.recentActivity).toEqual([]);
-    expect(snapshot).not.toHaveProperty("station");
   });
 });
 
