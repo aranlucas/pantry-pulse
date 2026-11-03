@@ -25,3 +25,13 @@ responsible for generating unique high-entropy values, storing them as
 Cloudflare secrets or local untracked configuration, rotating them after any
 suspected disclosure, and giving clients the least-privileged token that meets
 their needs.
+
+| Token             | Intended client and scope                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_TOKEN`     | Dashboard and non-device `/api/*` routes. The dashboard stores it in browser session storage, with an in-memory fallback. |
+| `DEVICE_TOKEN`    | Station; only `POST /api/device/scans`.                                                                                   |
+| `MCP_READ_TOKEN`  | `/mcp`: `pantry_snapshot` and `shopping_queue_export`.                                                                    |
+| `MCP_WRITE_TOKEN` | `/mcp`: read tools plus `pantry_adjust` and `pantry_link_item`.                                                           |
+
+Keep `.dev.vars`, firmware `config.h`, Wi-Fi credentials, TLS material, and all
+bearer tokens out of Git.
