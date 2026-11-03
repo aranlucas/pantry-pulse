@@ -66,13 +66,15 @@ pnpm check
 pnpm test
 ```
 
-`pnpm check` runs formatting, linting, type checking, the application build, and a
-deployment dry run. `pnpm test` runs the client and Worker Vitest suites. Type
-checking generates ignored Worker declarations under `.cloudflare/types/` first.
+`pnpm check` runs formatting, linting, type checking, and `cf deploy --dry-run`,
+which builds the application and validates the upload without sending it.
+`pnpm test` runs the `client` (Node) and `worker` (Workers runtime) Vitest
+projects. Type checking generates ignored Worker declarations under
+`.cloudflare/types/` first.
 
-`pnpm build` runs `cf build` to package the Worker and dashboard together in `.cloudflare/output/`. `pnpm deploy` builds the application and deploys that output with `cf deploy --prebuilt --mode production`. Vite records the build mode, so prebuilt deployments must specify the same mode. To validate the built output without uploading anything, run `pnpm cf deploy --prebuilt --mode production --dry-run` after `pnpm build`.
+To deploy, run `pnpm cf deploy`; it builds the Worker and dashboard into `.cloudflare/output/` and uploads them. `pnpm build` runs only the build step. Use `pnpm cf deploy`, not `pnpm deploy`, which is pnpm's built-in workspace command.
 
-The project uses the [Cloudflare CLI](https://developers.cloudflare.com/cf/) and Cloudflare Vite plugin 2.0 beta. `cloudflare.config.ts` owns Worker settings and bindings; `vite.config.ts` configures development and bundling. `cf` is currently in beta.
+The project uses the [Cloudflare CLI](https://developers.cloudflare.com/cf/) and Cloudflare Vite plugin 2.0 beta. `cloudflare.config.ts` owns Worker settings and bindings; `vite.config.ts` configures development, bundling, and both Vitest projects. `cf` is currently in beta.
 
 ## Security and retention
 

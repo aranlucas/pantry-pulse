@@ -3,7 +3,7 @@
 Before adding a script file (`scripts/`, `bin/`, `tools/`, root `*.sh|*.py|*.mjs`) or a package script that runs one, take the first rung that works:
 
 1. A flag or subcommand of a tool the repo already uses (`<tool> --help`).
-2. Declarative config for that tool (`vite.config.ts`, `cloudflare.config.ts`, `vitest.config.ts`, `vitest.client.config.ts`, `oxfmt.config.ts`, `pnpm-workspace.yaml`).
+2. Declarative config for that tool (`vite.config.ts` for Vite and Vitest, `cloudflare.config.ts`, `oxfmt.config.ts`, `pnpm-workspace.yaml`).
 3. A maintained plugin for that tool.
 4. A one-line package.json script that calls a native command.
 5. A test in the existing runner (Vitest), for anything that asserts.

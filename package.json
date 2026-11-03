@@ -6,50 +6,47 @@
   "scripts": {
     "build": "cf build",
     "cf-typegen": "cf workers types",
-    "cf-typegen:check": "pnpm typecheck",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && cf deploy --prebuilt --mode production --dry-run",
-    "db:migrate:local": "cf d1 migrations apply 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --dir migrations --local --persist-to .cloudflare/state",
-    "db:migrate:remote": "cf d1 migrations apply 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --dir migrations",
-    "db:seed:local": "cf d1 raw 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --local --persist-to .cloudflare/state --sql \"$(cat scripts/seed.sql)\"",
-    "db:seed:remote": "cf d1 raw 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --sql \"$(cat scripts/seed.sql)\"",
-    "deploy": "pnpm build && cf deploy --prebuilt --mode production",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && cf deploy --dry-run",
+    "db:migrate:local": "cf d1 migrations apply 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --local --persist-to .cloudflare/state",
+    "db:migrate:remote": "cf d1 migrations apply 8bfb84c2-9c88-42f0-84d4-e3987d8d2284",
+    "db:seed:local": "cf d1 raw 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --local --persist-to .cloudflare/state --sql @scripts/seed.sql",
+    "db:seed:remote": "cf d1 raw 8bfb84c2-9c88-42f0-84d4-e3987d8d2284 --sql @scripts/seed.sql",
     "dev": "portless run vite",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "test": "vitest run --config vitest.client.config.ts && vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm cf-typegen && tsc --project tsconfig.json",
-    "cf": "cf",
     "prepare": "husky"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
-    "agents": "0.30.1",
-    "lucide-react": "1.61.0",
+    "agents": "0.33.0",
+    "lucide-react": "1.67.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@aranlucas/oxforge": "0.3.0",
-    "@cloudflare/vite-plugin": "2.0.0-beta.v.4",
-    "@cloudflare/vitest-plugin": "1.4.7",
-    "@types/node": "26.6.5",
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.11",
+    "@cloudflare/vitest-plugin": "1.5.1",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "6.1.2",
-    "cf": "1.0.0-beta.21",
+    "@vitejs/plugin-react": "6.2.1",
+    "cf": "1.0.0-beta.27",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
-    "oxfmt": "^0.74.0",
-    "oxlint": "^1.89.0",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
     "oxlint-tsgolint": "^7.0.2005",
-    "portless": "0.15.12",
+    "portless": "0.15.13",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": [
@@ -63,5 +60,5 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@12.14.0"
+  "packageManager": "pnpm@12.16.1"
 }

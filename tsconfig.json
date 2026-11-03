@@ -19,13 +19,5 @@
       "@test/*": ["./test/*"]
     }
   },
-  "include": [
-    "src",
-    "test",
-    "cloudflare.config.ts",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "vitest.client.config.ts",
-    ".cloudflare/types"
-  ]
+  "include": ["src", "test", "cloudflare.config.ts", "vite.config.ts", ".cloudflare/types"]
 }
