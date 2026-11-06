@@ -140,6 +140,7 @@ test("a delayed refresh cannot replace newer stock", async ({ app, screen, brows
   const ready = new Promise<void>((resolve) => {
     entered = resolve;
   });
+
   const resumed = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -171,6 +172,8 @@ test("a delayed refresh cannot replace newer stock", async ({ app, screen, brows
     release();
   }
 
+  await expect(browser.locator(".dashboard-notices")).not.toContainText("Refreshing pantry");
+  await expect(browser.locator("#item-controls-itm-coffee output")).toHaveText("3");
   await screen.getByRole("button", "Link a tag").tap();
   await screen.getByLabel("Pantry item").selectOption("itm-coffee");
   await expect(screen.getByLabel("On hand")).toHaveValue("3");
