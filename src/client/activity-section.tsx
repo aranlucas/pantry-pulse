@@ -2,7 +2,6 @@ import { ArrowDown, ArrowUp, ScanLine } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { formatActivitySource, formatDate, formatRfidUid } from "./format";
-import { activityWasConsumed } from "./snapshot";
 import type { ActivityEvent } from "./types";
 
 type ActivitySectionProps = { events: ActivityEvent[] };
@@ -26,7 +25,7 @@ export function ActivitySection({ events }: ActivitySectionProps): ReactNode {
             <span role="columnheader">When</span>
           </div>
           {events.map((event) => {
-            const consumed = activityWasConsumed(event.delta);
+            const consumed = event.delta < 0;
 
             return (
               <div className="activity-row" role="row" key={event.eventId}>

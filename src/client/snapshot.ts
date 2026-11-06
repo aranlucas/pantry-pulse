@@ -16,7 +16,6 @@ const number = z
   ])
   .catch(0);
 
-// Missing or invalid identifiers fall back to their stable position-based IDs.
 const identifier = z.string().nullable().catch(null);
 
 const inventoryFields = z.object({
@@ -94,7 +93,3 @@ const snapshotFields = z.object({
 export const snapshotSchema: z.ZodType<PantrySnapshot> = snapshotFields.catch(() =>
   snapshotFields.parse({}),
 );
-
-export function activityWasConsumed(delta: number): boolean {
-  return delta < 0;
-}

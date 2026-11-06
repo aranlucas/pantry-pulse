@@ -4,11 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 // Browser-side tests run in Node; everything else runs in the Workers runtime.
-const clientTests = [
-  "test/client-dashboard.test.tsx",
-  "test/client-motion.test.ts",
-  "test/client-http.test.ts",
-];
+const clientTests = ["test/client-*.test.{ts,tsx}"];
 
 export default defineConfig({
   resolve: { tsconfigPaths: true },

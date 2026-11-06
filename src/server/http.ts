@@ -119,7 +119,6 @@ function issue(cause: unknown): ApiProblem {
     };
   }
 
-  // Keep unexpected API failures observable while returning a generic public error.
   // oxlint-disable-next-line no-console
   console.error("Unhandled Pantry Pulse API error", cause);
 

@@ -14,14 +14,18 @@ type AppHeaderProps = {
   onNavigate: (view: View) => void;
 };
 
-type NavLink = { view: View; label: string };
+type NavLink = { view: View; label: string; mobileLabel?: string; icon: LucideIcon };
+
+const links: NavLink[] = [
+  { view: "pantry", label: "Pantry", icon: PackageOpen },
+  { view: "queue", label: "Shopping queue", mobileLabel: "Queue", icon: ShoppingCart },
+  { view: "activity", label: "Activity", icon: ScanLine },
+];
 
 type MobileNavProps = {
   activeView: View;
   onNavigate: (view: View) => void;
 };
-
-type MobileNavLink = NavLink & { icon: LucideIcon };
 
 export function BrandMark({ onHome }: BrandMarkProps = {}): ReactNode {
   return (
@@ -56,12 +60,6 @@ export function Spinner({ label }: SpinnerProps): ReactNode {
 }
 
 export function AppHeader({ activeView, onLock, onNavigate }: AppHeaderProps): ReactNode {
-  const links: NavLink[] = [
-    { view: "pantry", label: "Pantry" },
-    { view: "queue", label: "Shopping queue" },
-    { view: "activity", label: "Activity" },
-  ];
-
   return (
     <header className="app-header dashboard-header">
       <BrandMark onHome={() => onNavigate("pantry")} />
@@ -94,15 +92,9 @@ export function AppHeader({ activeView, onLock, onNavigate }: AppHeaderProps): R
 }
 
 export function MobileBottomNav({ activeView, onNavigate }: MobileNavProps): ReactNode {
-  const links: MobileNavLink[] = [
-    { view: "pantry", label: "Pantry", icon: PackageOpen },
-    { view: "queue", label: "Queue", icon: ShoppingCart },
-    { view: "activity", label: "Activity", icon: ScanLine },
-  ];
-
   return (
     <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
-      {links.map(({ view, label, icon: Icon }) => (
+      {links.map(({ view, label, mobileLabel, icon: Icon }) => (
         <button
           className={activeView === view ? "mobile-nav-link is-active" : "mobile-nav-link"}
           type="button"
@@ -111,7 +103,7 @@ export function MobileBottomNav({ activeView, onNavigate }: MobileNavProps): Rea
           onClick={() => onNavigate(view)}
         >
           <Icon size={21} strokeWidth={1.8} aria-hidden="true" />
-          <span>{label}</span>
+          <span>{mobileLabel ?? label}</span>
         </button>
       ))}
     </nav>
