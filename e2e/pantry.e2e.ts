@@ -133,6 +133,7 @@ test("a delayed refresh cannot replace newer stock", async ({ app, screen, brows
   await screen.getByRole("button", "Open pantry").tap();
   await expect(browser.locator("#item-controls-itm-coffee output")).toHaveText("1");
   let calls = 0;
+
   let entered!: () => void;
   let release!: () => void;
 

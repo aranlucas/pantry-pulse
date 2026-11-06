@@ -24,7 +24,7 @@ it("replays a concurrent consume that commits before the duplicate reads stock",
       entered();
       await resumed;
 
-      return statement.first<T>(column);
+      return column === undefined ? statement.first<T>() : statement.first<T>(column);
     },
     all: statement.all.bind(statement),
     run: statement.run.bind(statement),
