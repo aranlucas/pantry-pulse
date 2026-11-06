@@ -75,6 +75,7 @@ jobs:
 
   e2e:
     strategy:
+      fail-fast: false
       matrix:
         source: [fixed, audited-base]
     runs-on: ubuntu-latest
