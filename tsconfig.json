@@ -19,5 +19,13 @@
       "@test/*": ["./test/*"]
     }
   },
-  "include": ["src", "test", "cloudflare.config.ts", "vite.config.ts", ".cloudflare/types"]
+  "include": [
+    "src",
+    "test",
+    "cloudflare.config.ts",
+    "vite.config.ts",
+    ".cloudflare/types",
+    "e2e",
+    "e2e.config.ts"
+  ]
 }

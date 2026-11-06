@@ -72,3 +72,98 @@ jobs:
       - run: python -m pip install --disable-pip-version-check "platformio==6.2.0"
       - run: cp config.example.h config.h
       - run: pio run
+
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [fixed, audited-base]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e
+        with:
+          cache: true
+          require-lockfile: true
+      - name: Use audited sources for pre-fix browser reproduction
+        if: matrix.source == 'audited-base'
+        run: |
+          git fetch origin 8f229d0c4b91f530cf20e6e0b7b7c659a39da0a2
+          git restore --source=8f229d0c4b91f530cf20e6e0b7b7c659a39da0a2 -- src
+      - name: Prepare isolated local pantry
+        run: |
+          cp .dev.vars.example .dev.vars
+          pnpm db:migrate:local
+          pnpm db:seed:local
+      - run: pnpm exec e2e-web install chromium --with-deps
+      - run: pnpm exec e2e run
+        if: matrix.source == 'fixed'
+      - name: Require the four original browser regressions
+        if: matrix.source == 'audited-base'
+        run: |
+          set +e
+          pnpm exec e2e run
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('.e2e/junit.xml').getroot()
+          cases = root.findall('.//testcase')
+          failures = [case.attrib['name'] for case in cases if case.find('failure') is not None]
+          expected = ['committed adjustment survives', 'a late unauthorized response', 'link a tag and correct stock', 'a delayed refresh cannot']
+          assert len(cases) == 5, [case.attrib for case in cases]
+          assert len(failures) == 4, failures
+          assert all(any(name.startswith(prefix) for name in failures) for prefix in expected), failures
+          assert not root.findall('.//error')
+          PY
+      - name: Upload browser failure evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pantry-e2e-${{ matrix.source }}
+          path: .e2e/
+          include-hidden-files: true
+          retention-days: 7
+
+  pre-fix-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e
+        with:
+          cache: true
+          require-lockfile: true
+      - name: Demonstrate both regressions against audited base
+        run: |
+          git restore --source=8f229d0c4b91f530cf20e6e0b7b7c659a39da0a2 -- src
+          pnpm cf-typegen
+          set +e
+          pnpm exec vitest run test/client-http-regression.test.ts test/consume-regression.test.ts --reporter=junit --outputFile=pre-fix.xml
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pre-fix.xml').getroot()
+          cases = root.findall('.//testcase')
+          expected = {
+              'rejects malformed successful JSON instead of inventing an empty pantry',
+              'replays a concurrent consume that commits before the duplicate reads stock',
+          }
+          assert {case.attrib['name'] for case in cases} == expected
+          assert all(case.find('failure') is not None for case in cases)
+          assert not root.findall('.//error')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ !cancelled() }}
+        with:
+          name: pre-fix-regressions
+          path: pre-fix.xml

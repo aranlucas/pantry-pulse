@@ -19,3 +19,5 @@ firmware/esp32-rfid/config.h
 
 # Cloudflare CLI build output and generated types
 .cloudflare/
+
+.e2e/
