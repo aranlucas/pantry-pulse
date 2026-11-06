@@ -150,14 +150,14 @@ export function App(): ReactNode {
     const generation = session.current;
     setRefreshing(true);
     setError(null);
+    const request = ++snapshotRequest.current;
 
     try {
-      const request = ++snapshotRequest.current;
       const next = await fetchSnapshot(token);
-      if (generation !== session.current) return;
+      if (generation !== session.current || request !== snapshotRequest.current) return;
       if (request === snapshotRequest.current) acceptSnapshot(next);
     } catch (cause: unknown) {
-      if (generation !== session.current) return;
+      if (generation !== session.current || request !== snapshotRequest.current) return;
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
       } else {

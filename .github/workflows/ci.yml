@@ -74,6 +74,9 @@ jobs:
       - run: pio run
 
   e2e:
+    strategy:
+      matrix:
+        source: [fixed, audited-base]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -84,6 +87,11 @@ jobs:
         with:
           cache: true
           require-lockfile: true
+      - name: Use audited sources for pre-fix browser reproduction
+        if: matrix.source == 'audited-base'
+        run: |
+          git fetch origin 8f229d0c4b91f530cf20e6e0b7b7c659a39da0a2
+          git restore --source=8f229d0c4b91f530cf20e6e0b7b7c659a39da0a2 -- src
       - name: Prepare isolated local pantry
         run: |
           cp .dev.vars.example .dev.vars
@@ -91,11 +99,31 @@ jobs:
           pnpm db:seed:local
       - run: pnpm exec e2e-web install chromium --with-deps
       - run: pnpm exec e2e run
+        if: matrix.source == 'fixed'
+      - name: Require the three original browser regressions
+        if: matrix.source == 'audited-base'
+        run: |
+          set +e
+          pnpm exec e2e run
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('.e2e/junit.xml').getroot()
+          cases = root.findall('.//testcase')
+          failures = [case.attrib['name'] for case in cases if case.find('failure') is not None]
+          expected = ['committed adjustment survives', 'a late unauthorized response', 'link a tag and correct stock']
+          assert len(cases) == 4, [case.attrib for case in cases]
+          assert len(failures) == 3, failures
+          assert all(any(name.startswith(prefix) for name in failures) for prefix in expected), failures
+          assert not root.findall('.//error')
+          PY
       - name: Upload browser failure evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pantry-e2e
+          name: pantry-e2e-${{ matrix.source }}
           path: .e2e/
           include-hidden-files: true
           retention-days: 7

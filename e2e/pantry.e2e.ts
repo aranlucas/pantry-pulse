@@ -103,6 +103,7 @@ test("link a tag and correct stock atomically, retaining success if refresh fail
   await screen.getByLabel("Admin token").fill(token);
   await screen.getByRole("button", "Open pantry").tap();
   await screen.getByRole("button", "Link a tag").tap();
+  await screen.getByLabel("Pantry item").selectOption("itm-coffee");
   await screen.getByLabel("Tag UID").fill("A1B2C3D4");
   await screen.getByLabel("On hand").fill("4");
   await browser.route("**/api/snapshot", async (route) => {
