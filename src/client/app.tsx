@@ -1,6 +1,6 @@
 import { PackageOpen } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AccessGate } from "./access-gate";
 import { adjustItem, fetchSnapshot, isAuthError, linkItem } from "./api";
@@ -22,6 +22,8 @@ import type { InventoryItem, LinkItemInput, PantrySnapshot, View } from "./types
 type AuthState = "checking" | "locked" | "loading" | "ready";
 
 export function App(): ReactNode {
+  const session = useRef(0);
+  const snapshotRequest = useRef(0);
   const [restoredToken] = useState(readSessionToken);
 
   const [authState, setAuthState] = useState<AuthState>(
@@ -59,6 +61,11 @@ export function App(): ReactNode {
   }, []);
 
   const lock = useCallback((): void => {
+    session.current += 1;
+    setPendingItemId(null);
+    setRefreshing(false);
+    setDrawerBusy(false);
+    setDrawerOpen(false);
     clearSessionToken();
     setToken(null);
     setTokenInput("");
@@ -66,11 +73,15 @@ export function App(): ReactNode {
     setAuthError(null);
     setError(null);
     setNotice(null);
-    setDrawerOpen(false);
     setAuthState("locked");
   }, []);
 
   const handleAuthFailure = useCallback((cause: unknown): void => {
+    session.current += 1;
+    setPendingItemId(null);
+    setRefreshing(false);
+    setDrawerBusy(false);
+    setDrawerOpen(false);
     clearSessionToken();
     setToken(null);
     setSnapshot(null);
@@ -80,11 +91,12 @@ export function App(): ReactNode {
 
   useEffect(() => {
     let cancelled = false;
+    const generation = session.current;
 
     const restore = async (savedToken: string): Promise<void> => {
       const next = await fetchSnapshot(savedToken);
 
-      if (!cancelled) {
+      if (!cancelled && generation === session.current) {
         acceptSnapshot(next);
         setAuthState("ready");
       }
@@ -92,7 +104,7 @@ export function App(): ReactNode {
 
     if (restoredToken !== null) {
       restore(restoredToken).catch((cause: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && generation === session.current) {
           handleAuthFailure(cause);
         }
       });
@@ -113,16 +125,19 @@ export function App(): ReactNode {
       return;
     }
 
+    const generation = ++session.current;
     setAuthError(null);
     setAuthState("loading");
 
     try {
       const next = await fetchSnapshot(candidate);
+      if (generation !== session.current) return;
       writeSessionToken(candidate);
       setToken(candidate);
       acceptSnapshot(next);
       setAuthState("ready");
     } catch (cause: unknown) {
+      if (generation !== session.current) return;
       handleAuthFailure(cause);
     }
   };
@@ -132,19 +147,24 @@ export function App(): ReactNode {
       return;
     }
 
+    const generation = session.current;
     setRefreshing(true);
     setError(null);
 
     try {
-      acceptSnapshot(await fetchSnapshot(token));
+      const request = ++snapshotRequest.current;
+      const next = await fetchSnapshot(token);
+      if (generation !== session.current) return;
+      if (request === snapshotRequest.current) acceptSnapshot(next);
     } catch (cause: unknown) {
+      if (generation !== session.current) return;
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
       } else {
         setError(errorMessage(cause, "Could not refresh the pantry."));
       }
     } finally {
-      setRefreshing(false);
+      if (generation === session.current) setRefreshing(false);
     }
   };
 
@@ -153,22 +173,35 @@ export function App(): ReactNode {
       return;
     }
 
+    const generation = session.current;
+    let committed = false;
+    snapshotRequest.current += 1;
     setPendingItemId(item.id);
     setError(null);
     setNotice(null);
 
     try {
       await adjustItem(token, item.id, delta);
-      acceptSnapshot(await fetchSnapshot(token));
+      if (generation !== session.current) return;
+      committed = true;
       setNotice(`${item.name} ${delta > 0 ? "restocked" : "used"}.`);
+      const request = ++snapshotRequest.current;
+      const next = await fetchSnapshot(token);
+      if (generation !== session.current) return;
+      if (request === snapshotRequest.current) acceptSnapshot(next);
     } catch (cause: unknown) {
+      if (generation !== session.current) return;
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
       } else {
-        setError(errorMessage(cause, "The pantry count could not be updated."));
+        setError(
+          committed
+            ? "The count was saved, but the pantry could not refresh. Try again to refresh."
+            : errorMessage(cause, "The pantry count could not be updated."),
+        );
       }
     } finally {
-      setPendingItemId(null);
+      if (generation === session.current) setPendingItemId(null);
     }
   };
 
@@ -224,6 +257,9 @@ export function App(): ReactNode {
       return;
     }
 
+    const generation = session.current;
+    let committed = false;
+    snapshotRequest.current += 1;
     setDrawerBusy(true);
     setDrawerError(null);
     setError(null);
@@ -240,18 +276,28 @@ export function App(): ReactNode {
       };
 
       await linkItem(token, linkTargetId, input);
-      acceptSnapshot(await fetchSnapshot(token));
+      if (generation !== session.current) return;
+      committed = true;
       setDrawerOpen(false);
       setNotice(`${linkForm.name || "Item"} linked to the pantry station.`);
+      const request = ++snapshotRequest.current;
+      const next = await fetchSnapshot(token);
+      if (generation !== session.current) return;
+      if (request === snapshotRequest.current) acceptSnapshot(next);
     } catch (cause: unknown) {
+      if (generation !== session.current) return;
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
         setDrawerOpen(false);
       } else {
-        setDrawerError(errorMessage(cause, "The tag could not be linked."));
+        if (committed) {
+          setError("The link was saved, but the pantry could not refresh. Try again to refresh.");
+        } else {
+          setDrawerError(errorMessage(cause, "The tag could not be linked."));
+        }
       }
     } finally {
-      setDrawerBusy(false);
+      if (generation === session.current) setDrawerBusy(false);
     }
   };
 

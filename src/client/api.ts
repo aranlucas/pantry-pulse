@@ -24,7 +24,7 @@ const parsedJson = z.string().transform((text) => {
   try {
     return z.unknown().parse(JSON.parse(text));
   } catch {
-    return null;
+    throw new ApiError("The pantry station returned invalid JSON.", 502);
   }
 });
 
@@ -57,7 +57,16 @@ async function requestJson<T>(
       headers,
     });
 
-    const payload = parsedJson.parse(await response.text());
+    const text = await response.text();
+    const payload = response.ok
+      ? parsedJson.parse(text)
+      : (() => {
+          try {
+            return parsedJson.parse(text);
+          } catch {
+            return null;
+          }
+        })();
 
     if (!response.ok) {
       const body = errorEnvelope.parse(payload);
