@@ -547,6 +547,7 @@ describe("Pantry Pulse Worker", () => {
       onHand: 100_000,
       expectedQuantity: 1,
     });
+
     expect(raised.status).toBe(200);
     expect(await raised.json()).toMatchObject({ item: { quantity: 100_000 } });
 
@@ -554,15 +555,18 @@ describe("Pantry Pulse Worker", () => {
       onHand: 0,
       expectedQuantity: 100_000,
     });
+
     expect(lowered.status).toBe(200);
     expect(await lowered.json()).toMatchObject({ item: { quantity: 0 } });
     const journal = await env.DB.prepare("SELECT delta FROM inventory_events ORDER BY delta").all();
+
     expect(journal.results).toEqual([{ delta: -100_000 }, { delta: 99_999 }]);
 
     const oversized = await postJson("/api/items/itm-coffee/adjust", adminToken, {
       eventId: "evt-oversized-adjustment",
       delta: 1001,
     });
+
     expect(oversized.status).toBe(422);
     expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 0 });
   });

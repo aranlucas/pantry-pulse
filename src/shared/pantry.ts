@@ -47,7 +47,11 @@ export const pantrySnapshotSchema = z.object({
 });
 
 export type PantryItem = z.infer<typeof itemSchema>;
+
 export type PantrySnapshot = z.infer<typeof pantrySnapshotSchema>;
+
 export type ShoppingNeed = PantrySnapshot["shoppingQueue"][number];
+
 export type InventoryActivity = PantrySnapshot["recentActivity"][number];
+
 export type InventorySource = InventoryActivity["source"];

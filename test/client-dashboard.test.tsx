@@ -115,7 +115,10 @@ describe("activity direction", () => {
     [2, "RFID consume", "is-restocked", "Restocked"],
   ] as const)("renders delta %s independently of reason %s", (delta, reason, className, label) => {
     const original = snapshot.recentActivity[0];
-    if (!original) throw new Error("Missing activity fixture");
+
+    if (!original) {
+      throw new Error("Missing activity fixture");
+    }
 
     const html = renderToStaticMarkup(
       <ActivitySection events={[{ ...original, delta, reason }]} />,
