@@ -58,6 +58,7 @@ async function requestJson<T>(
     });
 
     const text = await response.text();
+
     const payload = response.ok
       ? parsedJson.parse(text)
       : (() => {

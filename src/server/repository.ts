@@ -214,10 +214,13 @@ export async function applyAdjustment(
     // Another request may have committed this same consume after our first
     // event lookup but before the item read. A replay is still a success.
     const concurrent = await getEvent(db, input.eventId);
+
     if (concurrent) {
       assertMatchingEvent(concurrent, input);
+
       return { item, eventId: input.eventId, idempotentReplay: true };
     }
+
     throw new PantryError("Inventory cannot be adjusted below zero", 409, "negative_inventory");
   }
 

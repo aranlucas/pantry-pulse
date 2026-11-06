@@ -90,13 +90,13 @@ export function App(): ReactNode {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     const generation = session.current;
 
     const restore = async (savedToken: string): Promise<void> => {
       const next = await fetchSnapshot(savedToken);
 
-      if (!cancelled && generation === session.current) {
+      if (!controller.signal.aborted && generation === session.current) {
         acceptSnapshot(next);
         setAuthState("ready");
       }
@@ -104,14 +104,14 @@ export function App(): ReactNode {
 
     if (restoredToken !== null) {
       restore(restoredToken).catch((cause: unknown) => {
-        if (!cancelled && generation === session.current) {
+        if (!controller.signal.aborted && generation === session.current) {
           handleAuthFailure(cause);
         }
       });
     }
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [acceptSnapshot, handleAuthFailure, restoredToken]);
 
@@ -131,13 +131,20 @@ export function App(): ReactNode {
 
     try {
       const next = await fetchSnapshot(candidate);
-      if (generation !== session.current) return;
+
+      if (generation !== session.current) {
+        return;
+      }
+
       writeSessionToken(candidate);
       setToken(candidate);
       acceptSnapshot(next);
       setAuthState("ready");
     } catch (cause: unknown) {
-      if (generation !== session.current) return;
+      if (generation !== session.current) {
+        return;
+      }
+
       handleAuthFailure(cause);
     }
   };
@@ -154,17 +161,28 @@ export function App(): ReactNode {
 
     try {
       const next = await fetchSnapshot(token);
-      if (generation !== session.current || request !== snapshotRequest.current) return;
-      if (request === snapshotRequest.current) acceptSnapshot(next);
+
+      if (generation !== session.current || request !== snapshotRequest.current) {
+        return;
+      }
+
+      if (request === snapshotRequest.current) {
+        acceptSnapshot(next);
+      }
     } catch (cause: unknown) {
-      if (generation !== session.current || request !== snapshotRequest.current) return;
+      if (generation !== session.current || request !== snapshotRequest.current) {
+        return;
+      }
+
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
       } else {
         setError(errorMessage(cause, "Could not refresh the pantry."));
       }
     } finally {
-      if (generation === session.current) setRefreshing(false);
+      if (generation === session.current) {
+        setRefreshing(false);
+      }
     }
   };
 
@@ -182,15 +200,28 @@ export function App(): ReactNode {
 
     try {
       await adjustItem(token, item.id, delta);
-      if (generation !== session.current) return;
+
+      if (generation !== session.current) {
+        return;
+      }
+
       committed = true;
       setNotice(`${item.name} ${delta > 0 ? "restocked" : "used"}.`);
       const request = ++snapshotRequest.current;
       const next = await fetchSnapshot(token);
-      if (generation !== session.current) return;
-      if (request === snapshotRequest.current) acceptSnapshot(next);
+
+      if (generation !== session.current) {
+        return;
+      }
+
+      if (request === snapshotRequest.current) {
+        acceptSnapshot(next);
+      }
     } catch (cause: unknown) {
-      if (generation !== session.current) return;
+      if (generation !== session.current) {
+        return;
+      }
+
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
       } else {
@@ -201,7 +232,9 @@ export function App(): ReactNode {
         );
       }
     } finally {
-      if (generation === session.current) setPendingItemId(null);
+      if (generation === session.current) {
+        setPendingItemId(null);
+      }
     }
   };
 
@@ -276,28 +309,41 @@ export function App(): ReactNode {
       };
 
       await linkItem(token, linkTargetId, input);
-      if (generation !== session.current) return;
+
+      if (generation !== session.current) {
+        return;
+      }
+
       committed = true;
       setDrawerOpen(false);
       setNotice(`${linkForm.name || "Item"} linked to the pantry station.`);
       const request = ++snapshotRequest.current;
       const next = await fetchSnapshot(token);
-      if (generation !== session.current) return;
-      if (request === snapshotRequest.current) acceptSnapshot(next);
+
+      if (generation !== session.current) {
+        return;
+      }
+
+      if (request === snapshotRequest.current) {
+        acceptSnapshot(next);
+      }
     } catch (cause: unknown) {
-      if (generation !== session.current) return;
+      if (generation !== session.current) {
+        return;
+      }
+
       if (isAuthError(cause)) {
         handleAuthFailure(cause);
         setDrawerOpen(false);
+      } else if (committed) {
+        setError("The link was saved, but the pantry could not refresh. Try again to refresh.");
       } else {
-        if (committed) {
-          setError("The link was saved, but the pantry could not refresh. Try again to refresh.");
-        } else {
-          setDrawerError(errorMessage(cause, "The tag could not be linked."));
-        }
+        setDrawerError(errorMessage(cause, "The tag could not be linked."));
       }
     } finally {
-      if (generation === session.current) setDrawerBusy(false);
+      if (generation === session.current) {
+        setDrawerBusy(false);
+      }
     }
   };
 

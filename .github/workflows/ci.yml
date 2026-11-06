@@ -100,7 +100,7 @@ jobs:
       - run: pnpm exec e2e-web install chromium --with-deps
       - run: pnpm exec e2e run
         if: matrix.source == 'fixed'
-      - name: Require the three original browser regressions
+      - name: Require the four original browser regressions
         if: matrix.source == 'audited-base'
         run: |
           set +e
@@ -113,9 +113,9 @@ jobs:
           root = ET.parse('.e2e/junit.xml').getroot()
           cases = root.findall('.//testcase')
           failures = [case.attrib['name'] for case in cases if case.find('failure') is not None]
-          expected = ['committed adjustment survives', 'a late unauthorized response', 'link a tag and correct stock']
-          assert len(cases) == 4, [case.attrib for case in cases]
-          assert len(failures) == 3, failures
+          expected = ['committed adjustment survives', 'a late unauthorized response', 'link a tag and correct stock', 'a delayed refresh cannot']
+          assert len(cases) == 5, [case.attrib for case in cases]
+          assert len(failures) == 4, failures
           assert all(any(name.startswith(prefix) for name in failures) for prefix in expected), failures
           assert not root.findall('.//error')
           PY
