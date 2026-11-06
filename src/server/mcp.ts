@@ -1,23 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
+import { itemSchema, pantrySnapshotSchema } from "../shared/pantry";
 import { applyAdjustment, getSnapshot, linkItem } from "./repository";
 import { mcpAdjustSchema, mcpLinkSchema, shoppingExportSchema } from "./schemas";
 import type { McpAccess } from "./types";
 import { PantryError } from "./types";
-
-const itemSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  unit: z.string(),
-  quantity: z.number(),
-  targetQuantity: z.number(),
-  rfidUid: z.string().nullable(),
-  catalogProvider: z.string().nullable(),
-  providerItemId: z.string().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
 
 const adjustmentResultSchema = z.object({
   item: itemSchema,
@@ -34,7 +22,6 @@ function result<T extends Record<string, unknown>>(value: T) {
 
 function toolError(cause: unknown) {
   if (!(cause instanceof PantryError)) {
-    // Keep unexpected tool failures observable while returning a generic public error.
     // oxlint-disable-next-line no-console
     console.error("Unexpected Pantry Pulse MCP tool error", cause);
   }
@@ -57,38 +44,7 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
       description:
         "Read the current pantry inventory, low-stock summary, derived shopping queue, and recent changes.",
       inputSchema: z.object({}),
-      outputSchema: z.object({
-        generatedAt: z.string(),
-        summary: z.object({
-          itemCount: z.number(),
-          lowStockCount: z.number(),
-          unitsNeeded: z.number(),
-        }),
-        items: z.array(itemSchema),
-        shoppingQueue: z.array(
-          z.object({
-            itemId: z.string(),
-            name: z.string(),
-            unit: z.string(),
-            quantityNeeded: z.number(),
-            catalogProvider: z.string().nullable(),
-            providerItemId: z.string().nullable(),
-          }),
-        ),
-        recentActivity: z.array(
-          z.object({
-            eventId: z.string(),
-            itemId: z.string(),
-            itemName: z.string(),
-            rfidUid: z.string().nullable(),
-            delta: z.number(),
-            source: z.enum(["admin", "device", "mcp"]),
-            reason: z.string(),
-            deviceId: z.string().nullable(),
-            createdAt: z.string(),
-          }),
-        ),
-      }),
+      outputSchema: pantrySnapshotSchema,
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -168,9 +124,7 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
         }
       },
     );
-  }
 
-  if (access === "write") {
     server.registerTool(
       "pantry_link_item",
       {

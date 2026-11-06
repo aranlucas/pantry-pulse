@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { quantityCorrection } from "@/client/link-form";
-import { activityWasConsumed, snapshotSchema } from "@/client/snapshot";
+import { snapshotSchema } from "@/client/snapshot";
 
 const workerSnapshot = {
   generatedAt: "2026-09-17T00:00:00.000Z",
@@ -96,9 +96,6 @@ describe("client snapshot contract", () => {
     expect(snapshot).not.toHaveProperty("activity");
     expect(snapshot.items[0]).not.toHaveProperty("onHand");
     expect(snapshot.items[0]).not.toHaveProperty("tagUid");
-    expect(activityWasConsumed(-1)).toBe(true);
-    expect(activityWasConsumed(1)).toBe(false);
-    expect(activityWasConsumed(0)).toBe(false);
   });
 });
 

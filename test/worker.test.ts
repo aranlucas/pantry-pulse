@@ -542,6 +542,35 @@ describe("Pantry Pulse Worker", () => {
     });
   });
 
+  it("journals large absolute corrections while limiting relative adjustments", async () => {
+    const raised = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 100_000,
+      expectedQuantity: 1,
+    });
+
+    expect(raised.status).toBe(200);
+    expect(await raised.json()).toMatchObject({ item: { quantity: 100_000 } });
+
+    const lowered = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 0,
+      expectedQuantity: 100_000,
+    });
+
+    expect(lowered.status).toBe(200);
+    expect(await lowered.json()).toMatchObject({ item: { quantity: 0 } });
+    const journal = await env.DB.prepare("SELECT delta FROM inventory_events ORDER BY delta").all();
+
+    expect(journal.results).toEqual([{ delta: -100_000 }, { delta: 99_999 }]);
+
+    const oversized = await postJson("/api/items/itm-coffee/adjust", adminToken, {
+      eventId: "evt-oversized-adjustment",
+      delta: 1001,
+    });
+
+    expect(oversized.status).toBe(422);
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 0 });
+  });
+
   it("rolls back the correction journal when linking an already-used RFID tag", async () => {
     const response = await postJson("/api/items/itm-oats/link", adminToken, {
       rfidUid: "A1B2C3D4",

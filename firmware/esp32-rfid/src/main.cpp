@@ -70,10 +70,6 @@ bool eventComesBefore(const StoredEvent& left, const StoredEvent& right) {
   return left.sequence < right.sequence;
 }
 
-void sortStoredEvents(StoredEvent* events, size_t count) {
-  std::sort(events, events + count, eventComesBefore);
-}
-
 void appendStoredEvent(JsonArray events, const StoredEvent& stored) {
   JsonObject event = events.add<JsonObject>();
   event["tag"] = stored.tag;
@@ -101,8 +97,6 @@ bool persistEvent(size_t slot, JsonObjectConst event) {
     return false;
   }
 
-  // NVS writes are checked by both returned length and readback before the
-  // corresponding event is admitted to the in-memory queue.
   if (preferences.getString(key.c_str(), "") != encoded) {
     Serial.printf("Outbox slot %u failed readback verification\n", static_cast<unsigned>(slot));
     preferences.remove(key.c_str());
@@ -356,7 +350,7 @@ void loadOutbox() {
     }
   }
 
-  sortStoredEvents(stored, count);
+  std::sort(stored, stored + count, eventComesBefore);
   JsonArray events = outboxEvents();
   for (size_t index = 0; index < count; ++index) appendStoredEvent(events, stored[index]);
   nextSequence = largestSequence == UINT32_MAX ? 1 : largestSequence + 1;

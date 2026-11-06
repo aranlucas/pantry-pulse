@@ -50,7 +50,6 @@ export function nullableInteger(value: string, label: string): number | null {
   return parsed;
 }
 
-/** Leave stock alone unless the user changed it from the drawer's original count. */
 export function quantityCorrection(
   value: string,
   originalQuantity: number | null,

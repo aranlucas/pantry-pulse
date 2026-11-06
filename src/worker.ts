@@ -54,7 +54,6 @@ async function pruneAndReport(db: D1Database): Promise<void> {
   const removed = await pruneInventoryEvents(db);
   const tombstoneCount = await countEventTombstones(db);
 
-  // Keep scheduled retention counts observable for maintenance and recovery.
   // oxlint-disable-next-line no-console
   console.info("inventory event retention", { removed, retentionDays: 90, tombstoneCount });
 }
@@ -76,7 +75,6 @@ export default {
             time: new Date().toISOString(),
           });
         } catch (error) {
-          // Keep health-check failures observable while the HTTP response remains generic.
           // oxlint-disable-next-line no-console
           console.error("D1 health check failed", error);
           response = Response.json(
@@ -98,7 +96,6 @@ export default {
         response = secured(await env.ASSETS.fetch(request), true);
       }
     } catch (error) {
-      // Keep request IDs and failure details available for operational diagnosis.
       // oxlint-disable-next-line no-console
       console.error("Unhandled Pantry Pulse request error", {
         requestId,
@@ -113,7 +110,6 @@ export default {
 
     response = secured(response);
     response.headers.set("X-Request-ID", requestId);
-    // Preserve structured request status and timing telemetry.
     // oxlint-disable-next-line no-console
     console.info("request", {
       requestId,

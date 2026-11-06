@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { ActivitySection } from "@/client/activity-section";
 import { Dashboard } from "@/client/dashboard";
 import type { PantrySnapshot } from "@/client/types";
 
@@ -105,5 +106,25 @@ describe("dashboard tree", () => {
       expect(countAttr(html, "id", "activity-view")).toBe(1);
       expect(countAttr(html, "data-active-view", view)).toBe(1);
     }
+  });
+});
+
+describe("activity direction", () => {
+  it.each([
+    [-1, "RFID restock", "is-consumed", "Consumed"],
+    [2, "RFID consume", "is-restocked", "Restocked"],
+  ] as const)("renders delta %s independently of reason %s", (delta, reason, className, label) => {
+    const original = snapshot.recentActivity[0];
+
+    if (!original) {
+      throw new Error("Missing activity fixture");
+    }
+
+    const html = renderToStaticMarkup(
+      <ActivitySection events={[{ ...original, delta, reason }]} />,
+    );
+
+    expect(html).toContain(`class="activity-direction ${className}"`);
+    expect(html).toContain(`>${label}</span>`);
   });
 });
