@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchSnapshot } from "@/client/api";
+import { z } from "zod";
+import { confirmCount, fetchSnapshot } from "@/client/api";
 
 describe("API error boundary", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -14,5 +15,35 @@ describe("API error boundary", () => {
     vi.stubGlobal("window", { setTimeout, clearTimeout });
     vi.stubGlobal("fetch", () => Promise.resolve(new Response(JSON.stringify(body), { status })));
     await expect(fetchSnapshot("test-token")).rejects.toThrow(message);
+  });
+});
+
+type CapturedRequest = { url: string; method: string | undefined; body: unknown };
+
+describe("count confirmation request", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sends only a compare-and-set count, never link fields that could clear a tag", async () => {
+    const requests: CapturedRequest[] = [];
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      requests.push({
+        url,
+        method: init?.method,
+        body: z.json().parse(JSON.parse(z.string().parse(init?.body))),
+      });
+
+      return Promise.resolve(new Response(JSON.stringify({ item: {} }), { status: 200 }));
+    });
+
+    await confirmCount("test-token", "itm/milk", 3);
+
+    expect(requests).toEqual([
+      {
+        url: "/api/items/itm%2Fmilk/link",
+        method: "POST",
+        body: { onHand: 3, expectedQuantity: 3 },
+      },
+    ]);
   });
 });

@@ -2,12 +2,30 @@ import { Check, CircleCheck, Copy, Package, ShoppingCart } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { formatQuantity } from "./format";
+import { formatChange, formatDate, formatNumber, formatQuantity } from "./format";
 import type { ShoppingItem } from "./types";
 
-type ShoppingReceiptProps = { items: ShoppingItem[] };
+type ShoppingReceiptProps = {
+  items: ShoppingItem[];
+  pendingItemId: string | null;
+  onConfirmCount: (item: ShoppingItem) => void;
+};
 
-export function ShoppingReceipt({ items }: ShoppingReceiptProps): ReactNode {
+function countLabel(item: ShoppingItem): string {
+  if (item.countStatus === "counted" && item.countedAt) {
+    return `Counted ${formatDate(item.countedAt)}`;
+  }
+
+  return item.countedAt
+    ? `Count needs a check · last counted ${formatDate(item.countedAt)}`
+    : "Count needs a check · never counted";
+}
+
+export function ShoppingReceipt({
+  items,
+  pendingItemId,
+  onConfirmCount,
+}: ShoppingReceiptProps): ReactNode {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
 
@@ -42,7 +60,9 @@ export function ShoppingReceipt({ items }: ShoppingReceiptProps): ReactNode {
         </div>
         <ShoppingCart size={25} strokeWidth={1.6} aria-hidden="true" />
       </div>
-      <p className="receipt-intro">Only the items below need attention.</p>
+      <p className="receipt-intro">
+        Only the items below need attention. Confirm a count when the shelf matches.
+      </p>
       {items.length ? (
         <ul className="receipt-list">
           {items.map((item) => (
@@ -54,6 +74,33 @@ export function ShoppingReceipt({ items }: ShoppingReceiptProps): ReactNode {
               <span className="receipt-amount">
                 {formatQuantity(item.quantityNeeded, item.unit)}
               </span>
+              <div className="receipt-details">
+                <p className="receipt-why">
+                  Have {formatNumber(item.quantity)} of{" "}
+                  {formatQuantity(item.targetQuantity, item.unit)}
+                </p>
+                <p>
+                  {item.lastChange
+                    ? `${formatChange(item.lastChange, item.unit)} · ${formatDate(item.lastChange.createdAt)}`
+                    : "No recent changes"}
+                </p>
+                <p
+                  className={
+                    item.countStatus === "counted" ? "receipt-count" : "receipt-count needs-check"
+                  }
+                >
+                  {countLabel(item)}
+                </p>
+                <button
+                  className="receipt-confirm-button"
+                  type="button"
+                  disabled={pendingItemId !== null}
+                  aria-label={`Confirm ${item.name} count of ${formatQuantity(item.quantity, item.unit)}`}
+                  onClick={() => onConfirmCount(item)}
+                >
+                  Count is right
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -712,6 +712,41 @@ label {
   white-space: nowrap;
 }
 
+.receipt-details {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 3px;
+  margin: -6px 0 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.receipt-why {
+  color: var(--charcoal);
+}
+
+.receipt-count.needs-check {
+  color: var(--tomato);
+}
+
+.receipt-confirm-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--rule-dark);
+  background: transparent;
+  color: var(--charcoal);
+  font-size: 10px;
+}
+
+.receipt-confirm-button:hover:not(:disabled) {
+  border-color: var(--charcoal);
+}
+
 .receipt-empty {
   margin-top: 36px;
   border-color: #a9c8bb;

@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+/**
+ * A stated on-hand count older than this needs a fresh check. Two weeks keeps
+ * one weekly restock review of slack and matches the roadmap's pilot window.
+ */
+export const countCheckAfterDays = 14;
+
+const inventorySourceSchema = z.enum(["admin", "device", "mcp"]);
+
+const countStatusSchema = z.enum(["counted", "needs_check"]);
+
 export const itemSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -9,6 +19,8 @@ export const itemSchema = z.object({
   rfidUid: z.string().nullable(),
   catalogProvider: z.string().nullable(),
   providerItemId: z.string().nullable(),
+  /** Last time someone stated the absolute on-hand count; relative scans never set it. */
+  countedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -27,8 +39,22 @@ export const pantrySnapshotSchema = z.object({
       name: z.string(),
       unit: z.string(),
       quantityNeeded: z.number(),
+      /** Why the item is queued: it has `quantity` of its `targetQuantity`. */
+      quantity: z.number(),
+      targetQuantity: z.number(),
       catalogProvider: z.string().nullable(),
       providerItemId: z.string().nullable(),
+      countedAt: z.string().nullable(),
+      countStatus: countStatusSchema,
+      /** Most recent applied journal entry, or null once history aged out of retention. */
+      lastChange: z
+        .object({
+          delta: z.number(),
+          source: inventorySourceSchema,
+          reason: z.string(),
+          createdAt: z.string(),
+        })
+        .nullable(),
     }),
   ),
   recentActivity: z.array(
@@ -38,7 +64,7 @@ export const pantrySnapshotSchema = z.object({
       itemName: z.string(),
       rfidUid: z.string().nullable(),
       delta: z.number(),
-      source: z.enum(["admin", "device", "mcp"]),
+      source: inventorySourceSchema,
       reason: z.string(),
       deviceId: z.string().nullable(),
       createdAt: z.string(),
@@ -52,6 +78,23 @@ export type PantrySnapshot = z.infer<typeof pantrySnapshotSchema>;
 
 export type ShoppingNeed = PantrySnapshot["shoppingQueue"][number];
 
+export type ShoppingNeedChange = NonNullable<ShoppingNeed["lastChange"]>;
+
+export type CountStatus = ShoppingNeed["countStatus"];
+
 export type InventoryActivity = PantrySnapshot["recentActivity"][number];
 
 export type InventorySource = InventoryActivity["source"];
+
+/** A count is confirmed only when someone stated it within the check window. */
+export function countStatus(countedAt: string | null, now: Date): CountStatus {
+  const counted = countedAt === null ? Number.NaN : Date.parse(countedAt);
+
+  if (Number.isNaN(counted)) {
+    return "needs_check";
+  }
+
+  const ageMs = now.getTime() - counted;
+
+  return ageMs <= countCheckAfterDays * 24 * 60 * 60 * 1000 ? "counted" : "needs_check";
+}

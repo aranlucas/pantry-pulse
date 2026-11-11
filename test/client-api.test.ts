@@ -16,6 +16,7 @@ const workerSnapshot = {
       rfidUid: "A1B2C3D4",
       catalogProvider: "example-grocery",
       providerItemId: "sku-1",
+      countedAt: "2026-09-15T00:00:00.000Z",
       createdAt: "2026-09-01T00:00:00.000Z",
       updatedAt: "2026-09-17T00:00:00.000Z",
     },
@@ -26,8 +27,18 @@ const workerSnapshot = {
       name: "Oat milk",
       unit: "carton",
       quantityNeeded: 2,
+      quantity: 1,
+      targetQuantity: 3,
       catalogProvider: "example-grocery",
       providerItemId: "sku-1",
+      countedAt: "2026-09-15T00:00:00.000Z",
+      countStatus: "counted",
+      lastChange: {
+        delta: -1,
+        source: "admin",
+        reason: "manual adjustment",
+        createdAt: "2026-09-17T00:00:00.000Z",
+      },
     },
   ],
   recentActivity: [
@@ -170,5 +181,31 @@ describe("tolerant snapshot boundary", () => {
     expect(snapshot.recentActivity[0]).toMatchObject({ eventId: "", source: "admin", delta: -2 });
     expect(snapshotSchema.parse(null).items).toEqual([]);
     expect(snapshotSchema.parse([]).shoppingQueue).toEqual([]);
+  });
+
+  it("keeps queue reasons and never upgrades an unknown count status to confirmed", () => {
+    const [line] = workerSnapshot.shoppingQueue;
+
+    const snapshot = snapshotSchema.parse({
+      ...workerSnapshot,
+      shoppingQueue: [
+        line,
+        { ...line, itemId: "itm-unknown", countStatus: "verified", lastChange: { delta: "x" } },
+        { itemId: "itm-legacy" },
+      ],
+    });
+
+    expect(snapshot.items[0]?.countedAt).toBe("2026-09-15T00:00:00.000Z");
+    expect(snapshot.shoppingQueue[0]).toEqual(line);
+    expect(snapshot.shoppingQueue[1]).toMatchObject({
+      countStatus: "needs_check",
+      lastChange: null,
+    });
+    expect(snapshot.shoppingQueue[2]).toMatchObject({
+      quantity: 0,
+      countedAt: null,
+      countStatus: "needs_check",
+      lastChange: null,
+    });
   });
 });

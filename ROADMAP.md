@@ -25,6 +25,14 @@ Collect the baseline before building the first slice. Use voluntary pilot feedba
 
 Add “last confirmed” and “why replenish” details to the existing shopping queue before building prediction.
 
+**Shipped 2026-11-11.** Each queue line now shows its current count and target, its latest inventory change, and when its count was last confirmed. Counts not confirmed within 14 days are marked as needing a check. A **Count is right** action records a confirmation without changing stock. The same fields reach MCP snapshots and exports.
+
+Remaining limits:
+
+- Station scans are relative and never confirm a total, so a station-only household sees "needs a check" until someone confirms on the dashboard.
+- `lastChange` disappears once an item's history passes the 90-day retention window.
+- The 14-day window is a starting guess; tune it from pilot data.
+
 ## Dependencies and deliberate limits
 
 Keep this a household product initially. No automatic purchasing. Inventory uncertainty must be visible; expiry and food-safety claims require actual data rather than inference from scan history.

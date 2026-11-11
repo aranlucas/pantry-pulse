@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
-import { itemSchema, pantrySnapshotSchema } from "../shared/pantry";
+import { itemSchema, pantrySnapshotSchema, type ShoppingNeed } from "../shared/pantry";
 import { applyAdjustment, getSnapshot, linkItem } from "./repository";
 import { mcpAdjustSchema, mcpLinkSchema, shoppingExportSchema } from "./schemas";
 import type { McpAccess } from "./types";
@@ -18,6 +18,16 @@ function result<T extends Record<string, unknown>>(value: T) {
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
     structuredContent: value,
   };
+}
+
+/** One checklist line that also says why the item is queued and how sure the count is. */
+function markdownQueueLine(item: ShoppingNeed): string {
+  const count =
+    item.countStatus === "counted" && item.countedAt
+      ? `counted ${item.countedAt.slice(0, 10)}`
+      : "count needs a check";
+
+  return `- [ ] ${item.name} — ${item.quantityNeeded} ${item.unit} (have ${item.quantity} of ${item.targetQuantity}; ${count})`;
 }
 
 function toolError(cause: unknown) {
@@ -66,7 +76,7 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
     {
       title: "Export shopping queue",
       description:
-        "Export only the quantities needed to bring low-stock pantry items back to their targets.",
+        "Export only the quantities needed to bring low-stock pantry items back to their targets. Each line includes the current count, target, last change, and whether the count was confirmed recently or needs a check.",
       inputSchema: shoppingExportSchema,
       outputSchema: z.object({
         format: z.enum(["markdown", "json"]),
@@ -89,9 +99,7 @@ export function createPantryMcpServer(env: Cloudflare.Env, access: McpAccess): M
             ? JSON.stringify(snapshot.shoppingQueue, null, 2)
             : snapshot.shoppingQueue.length === 0
               ? "Pantry is stocked."
-              : snapshot.shoppingQueue
-                  .map((item) => `- [ ] ${item.name} — ${item.quantityNeeded} ${item.unit}`)
-                  .join("\n");
+              : snapshot.shoppingQueue.map(markdownQueueLine).join("\n");
 
         return result({ format, itemCount: snapshot.shoppingQueue.length, text });
       } catch (error) {

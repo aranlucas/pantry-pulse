@@ -4,8 +4,9 @@ import type {
   PantryItem,
   PantrySnapshot,
   ShoppingNeed,
+  ShoppingNeedChange,
 } from "./types";
-import { PantryError } from "./types";
+import { countStatus, PantryError } from "./types";
 
 const itemColumns = `
   id,
@@ -16,6 +17,7 @@ const itemColumns = `
   rfid_uid AS rfidUid,
   catalog_provider AS catalogProvider,
   provider_item_id AS providerItemId,
+  counted_at AS countedAt,
   created_at AS createdAt,
   updated_at AS updatedAt
 `;
@@ -67,6 +69,8 @@ type ItemLinkPatch = {
 };
 
 type CountRow = { count: number };
+
+type LatestChangeRow = ShoppingNeedChange & { itemId: string };
 
 function changes(result: D1Result): number {
   return result.meta.changes ?? 0;
@@ -160,8 +164,8 @@ export async function createItem(db: D1Database, input: CreateItemInput): Promis
   try {
     const insert = await db
       .prepare(
-        `INSERT INTO items (id, name, unit, quantity, target_quantity)
-         SELECT ?, ?, ?, ?, ?
+        `INSERT INTO items (id, name, unit, quantity, target_quantity, counted_at)
+         SELECT ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          WHERE (SELECT COUNT(*) FROM items) < ?`,
       )
       .bind(id, input.name, input.unit, input.quantity, input.targetQuantity, maxItems)
@@ -298,7 +302,8 @@ export async function applyAdjustment(
 /**
  * Patch supplied metadata only. A non-null quantity is an absolute correction:
  * compare against expectedQuantity (or the count read at command start for older
- * callers), then write metadata, stock, and its journal entry atomically.
+ * callers), then write metadata, stock, and its journal entry atomically. Any
+ * supplied count, including an unchanged one, records when it was confirmed.
  */
 export async function linkItem(
   db: D1Database,
@@ -351,6 +356,8 @@ export async function linkItem(
 
   if (correctingQuantity) {
     set("quantity", correctedQuantity);
+    // An expression, not a bound value: the positional values below stay aligned.
+    assignments.push("counted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
   }
 
   assignments.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
@@ -436,7 +443,9 @@ export async function linkItem(
 }
 
 export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
-  const queryResults = await db.batch<PantryItem | InventoryActivity>([
+  const generatedAt = new Date();
+
+  const queryResults = await db.batch<PantryItem | InventoryActivity | LatestChangeRow>([
     db.prepare(
       `SELECT ${itemColumns}
        FROM items
@@ -462,6 +471,25 @@ export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
        ORDER BY inventory_events.created_at DESC
        LIMIT 30`,
     ),
+    // The latest applied change explains why each queued item is low.
+    db.prepare(
+      `SELECT itemId, delta, source, reason, createdAt
+       FROM (
+         SELECT
+           item_id AS itemId,
+           delta,
+           source,
+           reason,
+           created_at AS createdAt,
+           ROW_NUMBER() OVER (
+             PARTITION BY item_id ORDER BY created_at DESC, rowid DESC
+           ) AS position
+         FROM inventory_events
+         WHERE applied_at IS NOT NULL
+           AND item_id IN (SELECT id FROM items WHERE quantity < target_quantity)
+       )
+       WHERE position = 1`,
+    ),
   ]);
 
   const itemsResult = batchResult(queryResults, 0);
@@ -472,6 +500,12 @@ export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
   // SAFETY: The second SELECT explicitly projects InventoryActivity columns and aliases;
   // D1 returns its rows at batch index 1, without mixing the first statement’s rows.
   const recentActivity = activityResult.results as InventoryActivity[];
+  // SAFETY: The third SELECT projects exactly LatestChangeRow's columns and aliases.
+  const latestChanges = batchResult(queryResults, 2).results as LatestChangeRow[];
+
+  const lastChangeByItem = new Map(
+    latestChanges.map(({ itemId, ...change }) => [itemId, change] as const),
+  );
 
   const shoppingQueue: ShoppingNeed[] = items
     .filter((item) => item.quantity < item.targetQuantity)
@@ -480,12 +514,17 @@ export async function getSnapshot(db: D1Database): Promise<PantrySnapshot> {
       name: item.name,
       unit: item.unit,
       quantityNeeded: item.targetQuantity - item.quantity,
+      quantity: item.quantity,
+      targetQuantity: item.targetQuantity,
       catalogProvider: item.catalogProvider,
       providerItemId: item.providerItemId,
+      countedAt: item.countedAt,
+      countStatus: countStatus(item.countedAt, generatedAt),
+      lastChange: lastChangeByItem.get(item.id) ?? null,
     }));
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: generatedAt.toISOString(),
     summary: {
       itemCount: items.length,
       lowStockCount: shoppingQueue.length,
