@@ -4,7 +4,10 @@ export type {
   PantryItem,
   PantrySnapshot,
   ShoppingNeed,
+  ShoppingNeedChange,
 } from "../shared/pantry";
+
+export { countStatus } from "../shared/pantry";
 
 export type McpAccess = "read" | "write";
 

@@ -144,6 +144,17 @@ export async function linkItem(token: string, itemId: string, input: LinkItemInp
   });
 }
 
+/**
+ * Record that the displayed on-hand count is correct without changing stock.
+ * Sends only the compare-and-set count, so it can never touch tag or catalog links.
+ */
+export async function confirmCount(token: string, itemId: string, quantity: number): Promise<void> {
+  await requestJson(token, `/api/items/${encodeURIComponent(itemId)}/link`, ignoredResponse, {
+    method: "POST",
+    body: JSON.stringify({ onHand: quantity, expectedQuantity: quantity }),
+  });
+}
+
 export function isAuthError(cause: unknown): boolean {
   return cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
 }

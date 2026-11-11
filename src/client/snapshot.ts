@@ -27,19 +27,39 @@ const inventoryFields = z.object({
   rfidUid: nullableText,
   catalogProvider: nullableText,
   providerItemId: nullableText,
+  countedAt: nullableText,
   createdAt: text,
   updatedAt: text,
 });
 
 const inventorySchema = inventoryFields.catch(() => inventoryFields.parse({}));
 
+const sourceSchema = z.enum(["admin", "device", "mcp"]).catch("admin");
+
+// Without a real delta and time there is no change to explain; show none instead.
+const lastChangeSchema = z
+  .object({
+    delta: z.number(),
+    source: sourceSchema,
+    reason: text,
+    createdAt: z.string(),
+  })
+  .nullable()
+  .catch(null);
+
 const shoppingFields = z.object({
   itemId: identifier,
   name: z.string().catch("Unnamed item"),
   unit: z.string().catch("item"),
   quantityNeeded: number,
+  quantity: number,
+  targetQuantity: number,
   catalogProvider: nullableText,
   providerItemId: nullableText,
+  countedAt: nullableText,
+  // An unknown status must never claim the count was confirmed.
+  countStatus: z.enum(["counted", "needs_check"]).catch("needs_check"),
+  lastChange: lastChangeSchema,
 });
 
 const shoppingSchema = shoppingFields.catch(() => shoppingFields.parse({}));
@@ -50,7 +70,7 @@ const activityFields = z.object({
   itemName: z.string().catch("Unnamed item"),
   rfidUid: nullableText,
   delta: number,
-  source: z.enum(["admin", "device", "mcp"]).catch("admin"),
+  source: sourceSchema,
   reason: text,
   deviceId: nullableText,
   createdAt: z.string().catch(() => new Date().toISOString()),

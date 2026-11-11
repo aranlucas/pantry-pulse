@@ -5,7 +5,7 @@ import { ActivitySection } from "./activity-section";
 import { AppHeader, MobileBottomNav, Spinner } from "./chrome";
 import { InventoryHeader, InventoryLedger } from "./inventory";
 import { ShoppingReceipt } from "./shopping-receipt";
-import type { InventoryItem, PantrySnapshot, View } from "./types";
+import type { InventoryItem, PantrySnapshot, ShoppingItem, View } from "./types";
 
 type DashboardProps = {
   snapshot: PantrySnapshot;
@@ -16,6 +16,7 @@ type DashboardProps = {
   notice: string | null;
   error: string | null;
   onAdjust: (item: InventoryItem, delta: number) => void;
+  onConfirmCount: (item: ShoppingItem) => void;
   onLink: () => void;
   onLock: () => void;
   onNavigate: (view: View) => void;
@@ -32,6 +33,7 @@ export function Dashboard({
   notice,
   error,
   onAdjust,
+  onConfirmCount,
   onLink,
   onLock,
   onNavigate,
@@ -75,7 +77,11 @@ export function Dashboard({
           <ActivitySection events={snapshot.recentActivity} />
         </section>
         <aside className="shopping-pane">
-          <ShoppingReceipt items={snapshot.shoppingQueue} />
+          <ShoppingReceipt
+            items={snapshot.shoppingQueue}
+            pendingItemId={pendingItemId}
+            onConfirmCount={onConfirmCount}
+          />
         </aside>
       </main>
       <MobileBottomNav activeView={activeView} onNavigate={onNavigate} />

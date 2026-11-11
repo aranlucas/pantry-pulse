@@ -4,6 +4,7 @@ import { SELF, env } from "cloudflare:test";
 import { assert, beforeEach, describe, expect, it } from "vitest";
 import { handleApi } from "@/server/http";
 import { applyAdjustment, getItem, linkItem, pruneInventoryEvents } from "@/server/repository";
+import { pantrySnapshotSchema } from "@/shared/pantry";
 
 const adminToken = "test-admin-token-with-enough-entropy";
 
@@ -86,6 +87,38 @@ async function mcpJson(response: Response): Promise<JsonValue> {
   }
 
   return z.json().parse(JSON.parse(data));
+}
+
+async function snapshotQueueLine(itemId: string) {
+  const response = await SELF.fetch("https://example.test/api/snapshot", {
+    headers: authorization(adminToken),
+  });
+
+  expect(response.status).toBe(200);
+  const snapshot = pantrySnapshotSchema.parse(await response.json());
+
+  return snapshot.shoppingQueue.find((line) => line.itemId === itemId);
+}
+
+const queueExportSchema = z.object({
+  result: z.object({
+    structuredContent: z.object({ itemCount: z.number(), text: z.string() }),
+  }),
+});
+
+async function exportQueue(format: "markdown" | "json", id: number) {
+  const response = await mcpRequest(
+    "tools/call",
+    { name: "shopping_queue_export", arguments: { format } },
+    id,
+    mcpReadToken,
+  );
+
+  return queueExportSchema.parse(await mcpJson(response)).result.structuredContent;
+}
+
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 // Hold one repository command immediately before its D1 transaction, while other
@@ -825,5 +858,174 @@ describe("Pantry Pulse Worker", () => {
 
     expect(oversized.status).toBe(413);
     expect(await oversized.json()).toMatchObject({ error: { code: "body_too_large" } });
+  });
+
+  it("explains each queued item with its count, target, and latest station change", async () => {
+    expect(await snapshotQueueLine("itm-coffee")).toEqual({
+      itemId: "itm-coffee",
+      name: "Coffee beans",
+      unit: "bag",
+      quantityNeeded: 1,
+      quantity: 1,
+      targetQuantity: 2,
+      catalogProvider: null,
+      providerItemId: null,
+      countedAt: null,
+      countStatus: "needs_check",
+      lastChange: null,
+    });
+
+    const scan = await postJson("/api/device/scans", deviceToken, {
+      eventId: "station-queue-reason-01",
+      tagUid: "a1:b2:c3:d4",
+      mode: "consume",
+    });
+
+    expect(scan.status).toBe(201);
+
+    expect(await snapshotQueueLine("itm-coffee")).toMatchObject({
+      quantity: 0,
+      targetQuantity: 2,
+      quantityNeeded: 2,
+      countStatus: "needs_check",
+      lastChange: { delta: -1, source: "device", reason: "RFID consume" },
+    });
+    expect(await snapshotQueueLine("itm-oats")).toBeUndefined();
+  });
+
+  it("reports only the newest applied change for a queued item", async () => {
+    // Sequential on purpose: the second change must be the newer one.
+    const first = await postJson("/api/items/itm-coffee/adjust", adminToken, {
+      eventId: "evt-reason-first",
+      delta: -1,
+      reason: "evt-reason-first",
+    });
+
+    expect(first.status).toBe(200);
+
+    const second = await postJson("/api/items/itm-coffee/adjust", adminToken, {
+      eventId: "evt-reason-second",
+      delta: 1,
+      reason: "evt-reason-second",
+    });
+
+    expect(second.status).toBe(200);
+
+    expect((await snapshotQueueLine("itm-coffee"))?.lastChange).toMatchObject({
+      delta: 1,
+      source: "admin",
+      reason: "evt-reason-second",
+    });
+  });
+
+  it("confirms an unchanged count without touching stock or the journal", async () => {
+    const confirmed = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 1,
+      expectedQuantity: 1,
+    });
+
+    expect(confirmed.status).toBe(200);
+
+    const { item } = z
+      .object({ item: z.object({ quantity: z.number(), countedAt: z.string() }) })
+      .parse(await confirmed.json());
+
+    expect(item.quantity).toBe(1);
+    expect(Date.now() - Date.parse(item.countedAt)).toBeLessThan(60_000);
+
+    expect(await snapshotQueueLine("itm-coffee")).toMatchObject({
+      quantity: 1,
+      countedAt: item.countedAt,
+      countStatus: "counted",
+    });
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_events").first<CountRow>(),
+    ).toEqual({ count: 0 });
+  });
+
+  it("rejects a stale count confirmation without recording it", async () => {
+    const stale = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 3,
+      expectedQuantity: 3,
+    });
+
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: { code: "inventory_conflict" } });
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 1, countedAt: null });
+  });
+
+  it("records a count for absolute corrections but not for relative adjustments", async () => {
+    const adjusted = await postJson("/api/items/itm-coffee/adjust", adminToken, {
+      eventId: "evt-relative-not-count",
+      delta: -1,
+      reason: "manual adjustment",
+    });
+
+    expect(adjusted.status).toBe(200);
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 0, countedAt: null });
+
+    const corrected = await postJson("/api/items/itm-coffee/link", adminToken, {
+      onHand: 1,
+      expectedQuantity: 0,
+    });
+
+    expect(corrected.status).toBe(200);
+    expect((await getItem(env.DB, "itm-coffee"))?.countedAt).toEqual(expect.any(String));
+  });
+
+  it.each([
+    [13, "counted"],
+    [15, "needs_check"],
+  ] as const)("treats a count from %s days ago as %s", async (age, status) => {
+    await env.DB.prepare("UPDATE items SET counted_at = ? WHERE id = 'itm-coffee'")
+      .bind(daysAgo(age))
+      .run();
+
+    expect((await snapshotQueueLine("itm-coffee"))?.countStatus).toBe(status);
+  });
+
+  it("records the initial count of a created item", async () => {
+    const created = await postJson("/api/items", adminToken, {
+      id: "itm-flour",
+      name: "Flour",
+      unit: "bag",
+      quantity: 0,
+      targetQuantity: 1,
+    });
+
+    expect(created.status).toBe(201);
+    expect(await snapshotQueueLine("itm-flour")).toMatchObject({
+      quantity: 0,
+      targetQuantity: 1,
+      countStatus: "counted",
+      lastChange: null,
+    });
+  });
+
+  it("exports queue reasons through MCP in both formats", async () => {
+    expect(await exportQueue("markdown", 40)).toEqual({
+      itemCount: 1,
+      text: "- [ ] Coffee beans — 1 bag (have 1 of 2; count needs a check)",
+    });
+
+    const countedAt = daysAgo(1);
+    await env.DB.prepare("UPDATE items SET counted_at = ? WHERE id = 'itm-coffee'")
+      .bind(countedAt)
+      .run();
+
+    expect((await exportQueue("markdown", 41)).text).toBe(
+      `- [ ] Coffee beans — 1 bag (have 1 of 2; counted ${countedAt.slice(0, 10)})`,
+    );
+    expect(JSON.parse((await exportQueue("json", 42)).text)).toEqual([
+      expect.objectContaining({
+        itemId: "itm-coffee",
+        quantityNeeded: 1,
+        quantity: 1,
+        targetQuantity: 2,
+        countedAt,
+        countStatus: "counted",
+        lastChange: null,
+      }),
+    ]);
   });
 });

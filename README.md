@@ -17,6 +17,18 @@ the images are concepts, not deployment screenshots.
 
 A non-null `onHand` is an absolute stock correction. Send `expectedQuantity` with the count the editor originally displayed to reject stale edits with `409 inventory_conflict`. If it is omitted, the command checks the count read when the request starts. The stock change, metadata, and inventory event commit together, or none do. On conflict, refresh the pantry and reopen the item before retrying. The dashboard sends a correction only when its on-hand field changed; MCP metadata linking never changes stock.
 
+Any non-null `onHand`, including one equal to the current count, also records `countedAt`: the last time someone stated the absolute count. An unchanged count updates `countedAt` only and adds no inventory event. Item creation records the initial count. Station scans and +/- adjustments are relative changes and never confirm a total. The shopping queue's **Count is right** button sends `{ "onHand": n, "expectedQuantity": n }`, so a count that changed since the page loaded gets the same `409 inventory_conflict`.
+
+## Shopping queue
+
+Each queue line in `/api/snapshot`, MCP `pantry_snapshot`, and MCP `shopping_queue_export` explains why the item is on the list:
+
+- `quantity` and `targetQuantity`: the item is queued because it has `quantity` of `targetQuantity`. `quantityNeeded` is the difference.
+- `lastChange`: the most recent applied inventory event (`delta`, `source`, `reason`, `createdAt`), or `null` once the item's history has passed the 90-day retention window.
+- `countedAt` and `countStatus`: `counted` when the count was stated within the last 14 days, otherwise `needs_check`, including items that have never been counted.
+
+The markdown export appends `(have 1 of 2; counted 2026-11-03)` or `(have 1 of 2; count needs a check)` to each checklist line. The JSON export contains the full queue lines.
+
 ## Local development
 
 Requirements:

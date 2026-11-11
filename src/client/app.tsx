@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AccessGate } from "./access-gate";
-import { adjustItem, fetchSnapshot, isAuthError, linkItem } from "./api";
+import { adjustItem, confirmCount, fetchSnapshot, isAuthError, linkItem } from "./api";
 import { Spinner } from "./chrome";
 import { Dashboard } from "./dashboard";
 import { errorMessage } from "./format";
@@ -17,7 +17,7 @@ import {
 import { LinkTagDrawer } from "./link-tag-drawer";
 import { scrollDashboardToView } from "./motion";
 import { clearSessionToken, readSessionToken, writeSessionToken } from "./session";
-import type { InventoryItem, LinkItemInput, PantrySnapshot, View } from "./types";
+import type { InventoryItem, LinkItemInput, PantrySnapshot, ShoppingItem, View } from "./types";
 
 type AuthState = "checking" | "locked" | "loading" | "ready";
 
@@ -238,6 +238,58 @@ export function App(): ReactNode {
     }
   };
 
+  const handleConfirmCount = async (item: ShoppingItem): Promise<void> => {
+    if (!token || pendingItemId) {
+      return;
+    }
+
+    const generation = session.current;
+    let committed = false;
+    snapshotRequest.current += 1;
+    setPendingItemId(item.itemId);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await confirmCount(token, item.itemId, item.quantity);
+
+      if (generation !== session.current) {
+        return;
+      }
+
+      committed = true;
+      setNotice(`${item.name} count confirmed.`);
+      const request = ++snapshotRequest.current;
+      const next = await fetchSnapshot(token);
+
+      if (generation !== session.current) {
+        return;
+      }
+
+      if (request === snapshotRequest.current) {
+        acceptSnapshot(next);
+      }
+    } catch (cause: unknown) {
+      if (generation !== session.current) {
+        return;
+      }
+
+      if (isAuthError(cause)) {
+        handleAuthFailure(cause);
+      } else {
+        setError(
+          committed
+            ? "The count was confirmed, but the pantry could not refresh. Try again to refresh."
+            : errorMessage(cause, "The count could not be confirmed."),
+        );
+      }
+    } finally {
+      if (generation === session.current) {
+        setPendingItemId(null);
+      }
+    }
+  };
+
   const openDrawer = (itemId?: string): void => {
     const selected =
       snapshot?.items.find((item) => item.id === itemId) ??
@@ -388,6 +440,7 @@ export function App(): ReactNode {
         notice={notice}
         error={error}
         onAdjust={(item, delta) => void handleAdjust(item, delta)}
+        onConfirmCount={(item) => void handleConfirmCount(item)}
         onLink={() => openDrawer()}
         onLock={lock}
         onNavigate={navigate}

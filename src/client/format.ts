@@ -1,4 +1,4 @@
-import type { ActivityEvent } from "./types";
+import type { ActivityEvent, ShoppingItem } from "./types";
 
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
@@ -22,6 +22,16 @@ export function formatActivitySource(source: ActivityEvent["source"]): string {
   }
 
   return "Dashboard";
+}
+
+/** Describe a journal change from the household's side: what was used or added, and by whom. */
+export function formatChange(
+  change: NonNullable<ShoppingItem["lastChange"]>,
+  unit: string,
+): string {
+  const amount = formatQuantity(Math.abs(change.delta), unit);
+
+  return `${change.delta < 0 ? "Used" : "Added"} ${amount} via ${formatActivitySource(change.source)}`;
 }
 
 export function formatDate(value: string): string {
