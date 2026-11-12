@@ -122,7 +122,7 @@ jobs:
           PY
       - name: Upload browser failure evidence
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: pantry-e2e-${{ matrix.source }}
           path: .e2e/
@@ -162,7 +162,7 @@ jobs:
           assert all(case.find('failure') is not None for case in cases)
           assert not root.findall('.//error')
           PY
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: ${{ !cancelled() }}
         with:
           name: pre-fix-regressions
