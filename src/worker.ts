@@ -34,7 +34,9 @@ function secured(response: Response, includeCsp = false): Response {
   return result;
 }
 
-function unauthorized(): Response {
+function unauthorized(invalidToken: boolean): Response {
+  const challenge = 'Bearer realm="pantry-pulse-mcp"';
+
   return new Response(
     JSON.stringify({
       error: { code: "unauthorized", message: "A valid bearer token is required" },
@@ -44,7 +46,9 @@ function unauthorized(): Response {
       headers: {
         "Cache-Control": "no-store",
         "Content-Type": "application/json; charset=utf-8",
-        "WWW-Authenticate": 'Bearer realm="pantry-pulse-mcp"',
+        "WWW-Authenticate": invalidToken
+          ? `${challenge}, error="invalid_token", error_description="Use the current MCP bearer token"`
+          : challenge,
       },
     },
   );
@@ -87,8 +91,8 @@ export default {
       } else if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
         const access = await getMcpAccess(request, env);
 
-        if (!access) {
-          response = unauthorized();
+        if (access === null || access === "invalid") {
+          response = unauthorized(access === "invalid");
         } else {
           response = await createPantryMcpHandler(env, access)(request, env, ctx);
         }
