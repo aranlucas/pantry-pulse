@@ -41,7 +41,7 @@ export async function hasDeviceAccess(request: Request, env: Cloudflare.Env): Pr
 export async function getMcpAccess(
   request: Request,
   env: Cloudflare.Env,
-): Promise<McpAccess | null> {
+): Promise<McpAccess | "invalid" | null> {
   const candidate = bearerToken(request);
 
   if (!candidate) {
@@ -56,5 +56,5 @@ export async function getMcpAccess(
     return "read";
   }
 
-  return null;
+  return "invalid";
 }

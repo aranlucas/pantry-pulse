@@ -736,18 +736,48 @@ describe("Pantry Pulse Worker", () => {
     ).toMatchObject({ count: 0 });
   });
 
-  it("publishes annotated MCP tools and executes pantry reads", async () => {
-    const denied = await SELF.fetch("https://pantry-pulse.workers.dev/mcp", {
+  it("challenges MCP requests without credentials", async () => {
+    const response = await SELF.fetch("https://pantry-pulse.workers.dev/mcp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
     });
 
-    expect(denied.status).toBe(401);
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe('Bearer realm="pantry-pulse-mcp"');
+  });
 
-    const dashboardTokenDenied = await mcpRequest("tools/list", {}, 99, adminToken);
-    expect(dashboardTokenDenied.status).toBe(401);
+  it.each([
+    ["unrecognized", "stale-mcp-token"],
+    ["dashboard", adminToken],
+    ["device", deviceToken],
+  ])("identifies a rejected %s token in the MCP challenge", async (_kind, token) => {
+    const response = await mcpRequest("tools/list", {}, 99, token);
 
+    expect(response.status).toBe(401);
+    const challenge = response.headers.get("WWW-Authenticate");
+    expect(challenge).toMatch(/^Bearer realm="pantry-pulse-mcp"/);
+    expect(challenge).toContain('error="invalid_token"');
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("keeps write tools unavailable to a read-only MCP client", async () => {
+    const response = await mcpRequest(
+      "tools/call",
+      {
+        name: "pantry_adjust",
+        arguments: { itemId: "itm-coffee", eventId: "evt-read-denied", delta: 1 },
+      },
+      1,
+      mcpReadToken,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await mcpJson(response)).toMatchObject({ error: { code: -32602 } });
+    expect(await getItem(env.DB, "itm-coffee")).toMatchObject({ quantity: 1 });
+  });
+
+  it("publishes annotated MCP tools and executes pantry reads", async () => {
     const initialized = await mcpRequest(
       "initialize",
       {

@@ -33,5 +33,11 @@ their needs.
 | `MCP_READ_TOKEN`  | `/mcp`: `pantry_snapshot` and `shopping_queue_export`.                                                                    |
 | `MCP_WRITE_TOKEN` | `/mcp`: read tools plus `pantry_adjust` and `pantry_link_item`.                                                           |
 
+`/mcp` requires a static bearer token on every request. A request without a
+bearer token receives a `401` Bearer challenge. A rejected token also receives
+`error="invalid_token"`. After rotation, update the token in the client's
+configuration. Pantry Pulse provides no OAuth discovery, token refresh, or
+provider account linking.
+
 Keep `.dev.vars`, firmware `config.h`, Wi-Fi credentials, TLS material, and all
 bearer tokens out of Git.
